@@ -47,16 +47,12 @@ const supabase = window.supabase.createClient(
 
 const api = {
   list:   async () => (await supabase.from("reports").select("*").order("created",{ascending:false})).data || [],
-  add:    async (b) => { await supabase.from("reports").insert(b); },
+  add:    async (b) => { 
+    const { error } = await supabase.from("reports").insert(b); 
+    if (error) { alert("Supabase error: " + error.message); }
+  },
   update: async (id, patch) => { await supabase.from("reports").update(patch).eq("id", id); },
 };
-
-/* ------------------------------------------------------------------ */
-const ROLES = {
-  reporter:  { label:"Reporter",  color:"var(--steel)", can:["report"] },
-  tester:    { label:"Tester",    color:"var(--moss)",  can:["report","verify","reopen"] },
-  developer: { label:"Developer", color:"var(--amber)", can:["progress","resolve"] },
-  admin:     { label:"Admin",     color:"var(--rust)",  can:["report","verify","assign","progress","resolve","reopen"] },
 };
 const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
 const STATUS = {
