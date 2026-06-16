@@ -284,6 +284,18 @@ function App(){
       const targetBug = bugs.find(b => b.id === id);
       const reporterEmail = targetBug.reporter.replace("guest:", "");
       
+      // Use the built-in Supabase client to automatically handle auth headers
+      await supabase.functions.invoke('notify-resolved-md', {
+        body: { email: reporterEmail, reportId: targetBug.id, title: targetBug.title }
+      });
+    }
+  };
+
+    // Trigger the email if marked resolved
+    if(patch.status === "resolved") {
+      const targetBug = bugs.find(b => b.id === id);
+      const reporterEmail = targetBug.reporter.replace("guest:", "");
+      
       await fetch("https://anuupbdmcqralxskdyur.supabase.co/functions/v1/notify-resolved-md", {
         method: "POST",
         body: JSON.stringify({ email: reporterEmail, reportId: targetBug.id, title: targetBug.title }),
