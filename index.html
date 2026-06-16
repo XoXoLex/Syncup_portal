@@ -231,9 +231,12 @@ function BugCard({b,me,onAct,onDelete}){
               <Act c="var(--moss-d)" onClick={()=>onAct(b.id,{status:"resolved"})}>✓ Mark resolved</Act>}
             {can.includes("verify") && b.status==="resolved" &&
               <Act c="var(--mut)" onClick={()=>onAct(b.id,{status:"closed"})}>Close</Act>}
-           {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
-              <Act c="var(--rust)" onClick={()=>onAct(b.id,{status:"reported",assignee:"—",due:""})}>↺ Reopen</Act>}
-          </div>
+            {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
+   <Act c="var(--rust)" onClick={()=>onAct(b.id,{status:"reported",assignee:"—",due:""})}>↺ Reopen</Act>}
+{can.includes("delete") &&
+   <Act c="#8a3a33" onClick={()=>{ if(confirm("Delete "+b.id+" permanently? This cannot be undone.")) onDelete(b.id); }}>🗑 Delete</Act>}
+</div>
+           
           {b.status==="resolved" &&
             <div style={{marginTop:10,fontSize:12,color:"var(--moss-d)",background:"var(--tint)",padding:"8px 11px",borderRadius:8}}>
               ✉ Notification queued to {b.reporter.replace("guest:","")}: “Your report has been resolved — thank you for letting us know.”
