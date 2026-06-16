@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SyncUp — Bug & Feedback Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#11201c; --panel:#ffffff; --bg:#eef2ee; --line:#d4ddd6;
+    --moss:#2f6f4f; --moss-d:#1f5239; --amber:#c6803a; --rust:#b0463c;
+    --steel:#3d6a7a; --mut:#5f7068; --tint:#e3ece5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  .disp{font-family:'Space Grotesk',sans-serif}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  input,textarea,select{font-family:inherit;font-size:14px}
+  ::placeholder{color:#9aa8a0}
+  .focus-ring:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useReducer } = React;
+
+/* ------------------------------------------------------------------ *
+ *  STORAGE LAYER
+ *  Swap these 4 functions for Supabase calls when deploying.
+ *  See the README. Right now it uses in-memory + a seed set so the
+ *  portal is fully clickable as a demo.
+ * ------------------------------------------------------------------ */
+const seed = [
+  { id:"BUG-1042", type:"bug", title:"Dark Mode toggle redirects to Edit Profile",
+    desc:"On the Settings page, clicking the Dark Mode toggle navigates to Edit Profile instead of switching theme.",
+    module:"Settings", severity:"medium", status:"verified", reporter:"ankur@bits", assignee:"—",
+    due:"", created:"2026-06-13", shot:null },
+  { id:"BUG-1043", type:"bug", title:"Resume extraction toast never resolves",
+    desc:"'Extracting resume' toast stays pinned across reloads for the whole session; resume endpoint polls ~1/sec.",
+    module:"App-wide", severity:"high", status:"assigned", reporter:"joel@bits", assignee:"dev:Vishwas",
+    due:"2026-06-18", created:"2026-06-13", shot:null },
+  { id:"BUG-1044", type:"feature", title:"Add account deletion option",
+    desc:"No way to delete an account anywhere. Needed for data-protection compliance.",
+    module:"Settings", severity:"low", status:"reported", reporter:"guest:meera@gmail.com", assignee:"—",
+    due:"", created:"2026-06-15", shot:null },
+];
+let MEM = JSON.parse(JSON.stringify(seed));
+const api = {
+  list: async () => JSON.parse(JSON.stringify(MEM)),
+  add:  async (b) => { MEM = [b, ...MEM]; },
+  update: async (id, patch) => { MEM = MEM.map(b => b.id===id ? {...b, ...patch} : b); },
+};
+
+/* ------------------------------------------------------------------ */
+const ROLES = {
+  reporter:  { label:"Reporter",  color:"var(--steel)", can:["report"] },
+  tester:    { label:"Tester",    color:"var(--moss)",  can:["report","verify","reopen"] },
+  developer: { label:"Developer", color:"var(--amber)", can:["progress","resolve"] },
+  admin:     { label:"Admin",     color:"var(--rust)",  can:["report","verify","assign","progress","resolve","reopen"] },
+};
+const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
+const STATUS = {
+  reported:   { label:"Reported",    c:"#3d6a7a" },
+  verified:   { label:"Verified",    c:"#2f6f4f" },
+  assigned:   { label:"Assigned",    c:"#7a5cb0" },
+  in_progress:{ label:"In Progress", c:"#c6803a" },
+  resolved:   { label:"Resolved",    c:"#1f5239" },
+  closed:     { label:"Closed",      c:"#5f7068" },
+};
+const SEV = { high:{l:"High",c:"#b0463c"}, medium:{l:"Medium",c:"#c6803a"}, low:{l:"Low",c:"#3d6a7a"} };
+const MODULES = ["Landing","Dashboard","Settings","Jobs","Connections","Profile","App-wide","Other"];
+
+function Pill({c,bg,children}){
+  return <span className="mono" style={{fontSize:11,fontWeight:600,color:c,background:bg||c+"1a",
+    padding:"3px 9px",borderRadius:20,letterSpacing:.3,whiteSpace:"nowrap"}}>{children}</span>;
+}
+
+/* ---------- LOGIN / ROLE GATE ---------- */
+function Identity({me,setMe}){
+  const [open,setOpen]=useState(false);
+  const [name,setName]=useState("");
+  const [role,setRole]=useState("tester");
+  if(me){
+    return (
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:13,fontWeight:600}}>{me.name}</div>
+          <div className="mono" style={{fontSize:10.5,color:ROLES[me.role].color,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{ROLES[me.role].label}</div>
+        </div>
+        <div style={{width:34,height:34,borderRadius:9,background:ROLES[me.role].color,color:"#fff",
+          display:"grid",placeItems:"center",fontWeight:700,fontSize:14}} className="disp">{me.name[0].toUpperCase()}</div>
+        <button className="focus-ring" onClick={()=>setMe(null)} style={{fontSize:12,color:"var(--mut)",padding:"6px 10px",border:"1px solid var(--line)",borderRadius:7,background:"#fff"}}>Sign out</button>
+      </div>
+    );
+  }
+  return (
+    <div style={{position:"relative"}}>
+      <button className="focus-ring" onClick={()=>setOpen(o=>!o)} style={{fontSize:13,fontWeight:600,color:"#fff",background:"var(--moss)",padding:"9px 16px",borderRadius:8}}>Sign in to act</button>
+      {open && (
+        <div style={{position:"absolute",right:0,top:46,width:260,background:"#fff",border:"1px solid var(--line)",
+          borderRadius:12,padding:16,boxShadow:"0 12px 40px rgba(17,32,28,.16)",zIndex:50}}>
+          <div className="disp" style={{fontSize:14,fontWeight:600,marginBottom:10}}>Sign in</div>
+          <input className="focus-ring" value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"
+            style={{width:"100%",padding:"9px 11px",border:"1px solid var(--line)",borderRadius:8,marginBottom:9}}/>
+          <select className="focus-ring" value={role} onChange={e=>setRole(e.target.value)}
+            style={{width:"100%",padding:"9px 11px",border:"1px solid var(--line)",borderRadius:8,marginBottom:12,background:"#fff"}}>
+            {Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <button className="focus-ring" disabled={!name.trim()} onClick={()=>{setMe({name:name.trim(),role});setOpen(false);}}
+            style={{width:"100%",padding:"10px",background:name.trim()?"var(--moss)":"#b9c7bf",color:"#fff",borderRadius:8,fontWeight:600,fontSize:13}}>Continue</button>
+          <p style={{fontSize:11,color:"var(--mut)",marginTop:10,lineHeight:1.4}}>Testers, developers and admins must sign in to change a bug. Reporting needs no account.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- REPORT FORM ---------- */
+function ReportForm({onSubmit,onClose}){
+  const [f,setF]=useState({type:"bug",title:"",desc:"",module:"Settings",severity:"medium",email:"",shot:null});
+  const set=(k,v)=>setF(s=>({...s,[k]:v}));
+  const pick=(e)=>{const file=e.target.files[0]; if(!file)return;
+    const r=new FileReader(); r.onload=()=>set("shot",r.result); r.readAsDataURL(file);};
+  const ok = f.title.trim() && f.desc.trim() && f.email.trim();
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(17,32,28,.45)",display:"grid",placeItems:"center",zIndex:100,padding:16}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:560,background:"#fff",borderRadius:16,padding:"26px 28px",maxHeight:"90vh",overflow:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <div>
+            <div className="disp" style={{fontSize:20,fontWeight:700}}>New report</div>
+            <div style={{fontSize:13,color:"var(--mut)",marginTop:2}}>No account needed — we'll email you when it's resolved.</div>
+          </div>
+          <button className="focus-ring" onClick={onClose} style={{fontSize:22,color:"var(--mut)",width:32,height:32,borderRadius:8}}>×</button>
+        </div>
+
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          {["bug","feature"].map(t=>(
+            <button key={t} className="focus-ring" onClick={()=>set("type",t)}
+              style={{flex:1,padding:"10px",borderRadius:9,fontWeight:600,fontSize:13,
+              border:"1.5px solid "+(f.type===t?"var(--moss)":"var(--line)"),
+              background:f.type===t?"var(--tint)":"#fff",color:f.type===t?"var(--moss-d)":"var(--mut)"}}>
+              {t==="bug"?"🐞 Report a bug":"✦ Request a feature"}
+            </button>
+          ))}
+        </div>
+
+        <Label>Title</Label>
+        <input className="focus-ring" value={f.title} onChange={e=>set("title",e.target.value)} placeholder="Short summary of the issue"
+          style={inp}/>
+        <Label>Description</Label>
+        <textarea className="focus-ring" value={f.desc} onChange={e=>set("desc",e.target.value)} rows={4}
+          placeholder="What happens, where, and what you expected instead." style={{...inp,resize:"vertical"}}/>
+        <div style={{display:"flex",gap:12}}>
+          <div style={{flex:1}}>
+            <Label>Module</Label>
+            <select className="focus-ring" value={f.module} onChange={e=>set("module",e.target.value)} style={{...inp,background:"#fff"}}>
+              {MODULES.map(m=><option key={m}>{m}</option>)}
+            </select>
+          </div>
+          <div style={{flex:1}}>
+            <Label>Severity</Label>
+            <select className="focus-ring" value={f.severity} onChange={e=>set("severity",e.target.value)} style={{...inp,background:"#fff"}}>
+              {Object.entries(SEV).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}
+            </select>
+          </div>
+        </div>
+        <Label>Your email</Label>
+        <input className="focus-ring" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="you@example.com" style={inp}/>
+        <Label>Screenshot (optional)</Label>
+        <input className="focus-ring" type="file" accept="image/*" onChange={pick} style={{fontSize:13,marginBottom:6}}/>
+        {f.shot && <img src={f.shot} alt="preview" style={{maxWidth:"100%",borderRadius:9,border:"1px solid var(--line)",marginTop:8}}/>}
+
+        <button className="focus-ring" disabled={!ok}
+          onClick={()=>onSubmit(f)}
+          style={{width:"100%",marginTop:20,padding:"13px",borderRadius:10,fontWeight:700,fontSize:14,
+          background:ok?"var(--moss)":"#b9c7bf",color:"#fff"}}>
+          Submit report
+        </button>
+      </div>
+    </div>
+  );
+}
+const inp={width:"100%",padding:"10px 12px",border:"1px solid var(--line)",borderRadius:9,marginBottom:14};
+function Label({children}){return <div className="mono" style={{fontSize:11,fontWeight:600,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.6,marginBottom:6}}>{children}</div>;}
+
+/* ---------- BUG ROW / DETAIL ---------- */
+function BugCard({b,me,onAct}){
+  const [open,setOpen]=useState(false);
+  const overdue = b.due && b.status!=="resolved" && b.status!=="closed" && new Date(b.due) < new Date("2026-06-16");
+  const can = me ? ROLES[me.role].can : [];
+  return (
+    <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:13,padding:"16px 18px",marginBottom:10}}>
+      <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:6}}>
+            <span className="mono" style={{fontSize:11.5,color:"var(--mut)",fontWeight:600}}>{b.id}</span>
+            <Pill c={STATUS[b.status].c}>{STATUS[b.status].label}</Pill>
+            <Pill c={SEV[b.severity].c}>{SEV[b.severity].l}</Pill>
+            {b.type==="feature" && <Pill c="#7a5cb0">Feature</Pill>}
+            {overdue && <Pill c="#fff" bg="var(--rust)">⚠ Overdue</Pill>}
+          </div>
+          <div className="disp" style={{fontSize:15.5,fontWeight:600,lineHeight:1.3,cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}>{b.title}</div>
+          <div style={{display:"flex",gap:14,marginTop:7,fontSize:12,color:"var(--mut)",flexWrap:"wrap"}}>
+            <span>📁 {b.module}</span>
+            <span>👤 {b.reporter}</span>
+            {b.assignee!=="—" && <span>🛠 {b.assignee}</span>}
+            {b.due && <span>⏱ due {b.due}</span>}
+          </div>
+        </div>
+        <button className="focus-ring" onClick={()=>setOpen(o=>!o)} style={{fontSize:12,color:"var(--moss)",fontWeight:600,whiteSpace:"nowrap"}}>{open?"Hide":"Details"}</button>
+      </div>
+
+      {open && (
+        <div style={{marginTop:14,paddingTop:14,borderTop:"1px dashed var(--line)"}}>
+          <p style={{fontSize:13.5,lineHeight:1.55,color:"#33433c",marginBottom:b.shot?12:0}}>{b.desc}</p>
+          {b.shot && <img src={b.shot} alt="" style={{maxWidth:"100%",borderRadius:9,border:"1px solid var(--line)"}}/>}
+
+          {/* ACTION BAR — role gated */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
+            {!me && <span style={{fontSize:12.5,color:"var(--mut)"}}>Sign in as a tester, developer or admin to act on this report.</span>}
+            {can.includes("verify") && b.status==="reported" &&
+              <Act c="var(--moss)" onClick={()=>onAct(b.id,{status:"verified"})}>✓ Verify</Act>}
+            {can.includes("assign") && b.status==="verified" &&
+              <Act c="#7a5cb0" onClick={()=>{const who=prompt("Assign to developer (name):"); if(who){const due=prompt("Timeline / due date (YYYY-MM-DD):","2026-06-20"); onAct(b.id,{status:"assigned",assignee:"dev:"+who,due:due||""});}}}>→ Assign to dev</Act>}
+            {can.includes("progress") && b.status==="assigned" &&
+              <Act c="var(--amber)" onClick={()=>onAct(b.id,{status:"in_progress"})}>▶ Start work</Act>}
+            {can.includes("resolve") && (b.status==="in_progress"||b.status==="assigned") &&
+              <Act c="var(--moss-d)" onClick={()=>onAct(b.id,{status:"resolved"})}>✓ Mark resolved</Act>}
+            {can.includes("verify") && b.status==="resolved" &&
+              <Act c="var(--mut)" onClick={()=>onAct(b.id,{status:"closed"})}>Close</Act>}
+            {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
+              <Act c="var(--rust)" onClick={()=>onAct(b.id,{status:"reported",assignee:"—",due:""})}>↺ Reopen</Act>}
+          </div>
+          {b.status==="resolved" &&
+            <div style={{marginTop:10,fontSize:12,color:"var(--moss-d)",background:"var(--tint)",padding:"8px 11px",borderRadius:8}}>
+              ✉ Notification queued to {b.reporter.replace("guest:","")}: “Your report has been resolved — thank you for letting us know.”
+            </div>}
+          {overdue &&
+            <div style={{marginTop:10,fontSize:12,color:"var(--rust)",background:"#b0463c14",padding:"8px 11px",borderRadius:8}}>
+              ⚠ Past its timeline — admin and tester would be notified automatically.
+            </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+function Act({c,onClick,children}){
+  return <button className="focus-ring" onClick={onClick}
+    style={{fontSize:12.5,fontWeight:600,color:"#fff",background:c,padding:"8px 13px",borderRadius:8}}>{children}</button>;
+}
+
+/* ---------- APP ---------- */
+function App(){
+  const [bugs,setBugs]=useState([]);
+  const [me,setMe]=useState(null);
+  const [showForm,setShowForm]=useState(false);
+  const [filter,setFilter]=useState("all");
+  const [q,setQ]=useState("");
+  const [toast,setToast]=useState(null);
+
+  const load=async()=>setBugs(await api.list());
+  useEffect(()=>{load();},[]);
+
+  const submit=async(f)=>{
+    const n=(1045+bugs.filter(b=>b.id.startsWith("BUG")).length);
+    const b={ id:(f.type==="feature"?"FEAT-":"BUG-")+n, type:f.type, title:f.title.trim(), desc:f.desc.trim(),
+      module:f.module, severity:f.severity, status:"reported", reporter:"guest:"+f.email.trim(),
+      assignee:"—", due:"", created:"2026-06-16", shot:f.shot };
+    await api.add(b); await load(); setShowForm(false);
+    setToast("Report submitted — thank you! We'll email "+f.email.trim()+" on resolution.");
+    setTimeout(()=>setToast(null),4200);
+  };
+  const act=async(id,patch)=>{ await api.update(id,patch); await load();
+    if(patch.status){ setToast("Updated "+id+" → "+STATUS[patch.status].label); setTimeout(()=>setToast(null),2600);} };
+
+  const counts = FLOW.reduce((a,s)=>{a[s]=bugs.filter(b=>b.status===s).length;return a;},{});
+  const shown = bugs.filter(b=>{
+    const mf = filter==="all"||b.status===filter;
+    const mq = !q || (b.title+b.desc+b.id+b.module).toLowerCase().includes(q.toLowerCase());
+    return mf&&mq;
+  });
+
+  return (
+    <div style={{minHeight:"100vh"}}>
+      {/* HEADER */}
+      <header style={{borderBottom:"1px solid var(--line)",background:"#fff"}}>
+        <div style={{maxWidth:1000,margin:"0 auto",padding:"16px 20px",display:"flex",alignItems:"center",gap:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:11,flex:1}}>
+            <div style={{width:38,height:38,borderRadius:10,background:"var(--moss)",display:"grid",placeItems:"center"}}>
+              <span className="disp" style={{color:"#fff",fontWeight:700,fontSize:19}}>S</span>
+            </div>
+            <div>
+              <div className="disp" style={{fontSize:17,fontWeight:700,letterSpacing:-.2}}>SyncUp Bug & Feedback Portal</div>
+              <div className="mono" style={{fontSize:11,color:"var(--mut)",letterSpacing:.3}}>report · verify · assign · resolve</div>
+            </div>
+          </div>
+          <Identity me={me} setMe={setMe}/>
+        </div>
+      </header>
+
+      <main style={{maxWidth:1000,margin:"0 auto",padding:"24px 20px 60px"}}>
+        {/* ACTION STRIP */}
+        <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+          <button className="focus-ring" onClick={()=>setShowForm(true)}
+            style={{background:"var(--moss)",color:"#fff",fontWeight:600,fontSize:14,padding:"11px 18px",borderRadius:10}}>+ New report</button>
+          <input className="focus-ring" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search reports…"
+            style={{flex:1,minWidth:180,padding:"11px 14px",border:"1px solid var(--line)",borderRadius:10,background:"#fff"}}/>
+        </div>
+
+        {/* STATUS FILTER TABS */}
+        <div style={{display:"flex",gap:7,marginBottom:18,flexWrap:"wrap"}}>
+          <Tab on={filter==="all"} onClick={()=>setFilter("all")} label="All" n={bugs.length} c="var(--ink)"/>
+          {FLOW.map(s=><Tab key={s} on={filter===s} onClick={()=>setFilter(s)} label={STATUS[s].label} n={counts[s]} c={STATUS[s].c}/>)}
+        </div>
+
+        {/* LIST */}
+        {shown.length===0
+          ? <div style={{textAlign:"center",padding:"60px 20px",color:"var(--mut)"}}>
+              <div style={{fontSize:30,marginBottom:8}}>🔍</div>
+              <div className="disp" style={{fontSize:16,fontWeight:600,marginBottom:4}}>Nothing here yet</div>
+              <div style={{fontSize:13}}>No reports match this view. Try “All”, or file a new report.</div>
+            </div>
+          : shown.map(b=><BugCard key={b.id} b={b} me={me} onAct={act}/>)
+        }
+      </main>
+
+      {showForm && <ReportForm onSubmit={submit} onClose={()=>setShowForm(false)}/>}
+      {toast &&
+        <div style={{position:"fixed",bottom:22,left:"50%",transform:"translateX(-50%)",background:"var(--ink)",color:"#fff",
+          padding:"13px 20px",borderRadius:11,fontSize:13.5,fontWeight:500,boxShadow:"0 10px 36px rgba(0,0,0,.28)",maxWidth:"90vw",zIndex:200}}>{toast}</div>}
+    </div>
+  );
+}
+function Tab({on,onClick,label,n,c}){
+  return <button className="focus-ring" onClick={onClick}
+    style={{fontSize:13,fontWeight:600,padding:"7px 13px",borderRadius:20,
+    border:"1px solid "+(on?c:"var(--line)"), background:on?c:"#fff", color:on?"#fff":"var(--mut)"}}>
+    {label} <span style={{opacity:.7,fontWeight:500}}>{n}</span></button>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
