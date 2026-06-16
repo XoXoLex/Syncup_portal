@@ -53,7 +53,6 @@ const api = {
   },
   update: async (id, patch) => { await supabase.from("reports").update(patch).eq("id", id); },
 };
-};
 const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
 const STATUS = {
   reported:   { label:"Reported",    c:"#3d6a7a" },
