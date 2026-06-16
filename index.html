@@ -52,12 +52,14 @@ const api = {
     if (error) { alert("Supabase error: " + error.message); }
   },
   update: async (id, patch) => { await supabase.from("reports").update(patch).eq("id", id); },
+  remove: async (id) => { await supabase.from("reports").delete().eq("id", id); },
+  clear:  async () => { await supabase.from("reports").delete().neq("id", ""); },
 };
 const ROLES = {
   reporter:  { label:"Reporter",  color:"var(--steel)", can:["report"] },
   tester:    { label:"Tester",    color:"var(--moss)",  can:["report","verify","reopen"] },
   developer: { label:"Developer", color:"var(--amber)", can:["progress","resolve"] },
-  admin:     { label:"Admin",     color:"var(--rust)",  can:["report","verify","assign","progress","resolve","reopen"] },
+ admin:     { label:"Admin",     color:"var(--rust)",  can:["report","verify","assign","progress","resolve","reopen","delete"] },
 };
 const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
 const STATUS = {
@@ -185,7 +187,7 @@ const inp={width:"100%",padding:"10px 12px",border:"1px solid var(--line)",borde
 function Label({children}){return <div className="mono" style={{fontSize:11,fontWeight:600,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.6,marginBottom:6}}>{children}</div>;}
 
 /* ---------- BUG ROW / DETAIL ---------- */
-function BugCard({b,me,onAct}){
+function BugCard({b,me,onAct,onDelete}){
   const [open,setOpen]=useState(false);
   const overdue = b.due && b.status!=="resolved" && b.status!=="closed" && new Date(b.due) < new Date("2026-06-16");
   const can = me ? ROLES[me.role].can : [];
@@ -229,7 +231,7 @@ function BugCard({b,me,onAct}){
               <Act c="var(--moss-d)" onClick={()=>onAct(b.id,{status:"resolved"})}>✓ Mark resolved</Act>}
             {can.includes("verify") && b.status==="resolved" &&
               <Act c="var(--mut)" onClick={()=>onAct(b.id,{status:"closed"})}>Close</Act>}
-            {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
+           {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
               <Act c="var(--rust)" onClick={()=>onAct(b.id,{status:"reported",assignee:"—",due:""})}>↺ Reopen</Act>}
           </div>
           {b.status==="resolved" &&
@@ -291,6 +293,10 @@ const act = async (id, patch) => {
       });
     }
   };
+  const del = async (id) => { await api.remove(id); await load();
+    setToast("Deleted "+id); setTimeout(()=>setToast(null),2400); };
+  const clearAll = async () => { if(!confirm("Delete ALL reports permanently? This cannot be undone.")) return;
+    await api.clear(); await load(); setToast("All reports cleared"); setTimeout(()=>setToast(null),2600); };
 
   const counts = FLOW.reduce((a,s)=>{a[s]=bugs.filter(b=>b.status===s).length;return a;},{});
   const shown = bugs.filter(b=>{
@@ -339,7 +345,7 @@ const act = async (id, patch) => {
               <div className="disp" style={{fontSize:16,fontWeight:600,marginBottom:4}}>Nothing here yet</div>
               <div style={{fontSize:13}}>No reports match this view. Try “All”, or file a new report.</div>
             </div>
-          : shown.map(b=><BugCard key={b.id} b={b} me={me} onAct={act}/>)
+         : shown.map(b=><BugCard key={b.id} b={b} me={me} onAct={act} onDelete={del}/>)
         }
       </main>
 
