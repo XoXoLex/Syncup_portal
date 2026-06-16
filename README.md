@@ -105,8 +105,6 @@ Every time you push a change to GitHub, Vercel re-deploys automatically.
 - **Overdue auto-check** (requirement 5): a scheduled Supabase function that
   runs daily and emails admin + tester for any past-due, unresolved bug.
 
-Both are small and well-documented; flag me when you're ready and I'll write them.
-
 ---
 
 ## File list
