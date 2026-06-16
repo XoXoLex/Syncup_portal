@@ -271,16 +271,16 @@ function App(){
     setToast("Report submitted — thank you! We'll email "+f.email.trim()+" on resolution.");
     setTimeout(()=>setToast(null),4200);
   };
- const act = async(id, patch) => { 
+const act = async (id, patch) => { 
     await api.update(id, patch); 
     await load();
-    if(patch.status) { 
+    if (patch.status) { 
       setToast("Updated " + id + " → " + STATUS[patch.status].label); 
       setTimeout(() => setToast(null), 2600);
     } 
 
     // Trigger the email if marked resolved
-    if(patch.status === "resolved") {
+    if (patch.status === "resolved") {
       const targetBug = bugs.find(b => b.id === id);
       const reporterEmail = targetBug.reporter.replace("guest:", "");
       
