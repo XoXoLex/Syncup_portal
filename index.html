@@ -53,6 +53,12 @@ const api = {
   },
   update: async (id, patch) => { await supabase.from("reports").update(patch).eq("id", id); },
 };
+const ROLES = {
+  reporter:  { label:"Reporter",  color:"var(--steel)", can:["report"] },
+  tester:    { label:"Tester",    color:"var(--moss)",  can:["report","verify","reopen"] },
+  developer: { label:"Developer", color:"var(--amber)", can:["progress","resolve"] },
+  admin:     { label:"Admin",     color:"var(--rust)",  can:["report","verify","assign","progress","resolve","reopen"] },
+};
 const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
 const STATUS = {
   reported:   { label:"Reported",    c:"#3d6a7a" },
