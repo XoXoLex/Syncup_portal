@@ -24,6 +24,7 @@
   ::placeholder{color:#9aa8a0}
   .focus-ring:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -36,25 +37,18 @@ const { useState, useEffect, useReducer } = React;
  *  See the README. Right now it uses in-memory + a seed set so the
  *  portal is fully clickable as a demo.
  * ------------------------------------------------------------------ */
-const seed = [
-  { id:"BUG-1042", type:"bug", title:"Dark Mode toggle redirects to Edit Profile",
-    desc:"On the Settings page, clicking the Dark Mode toggle navigates to Edit Profile instead of switching theme.",
-    module:"Settings", severity:"medium", status:"verified", reporter:"ankur@bits", assignee:"—",
-    due:"", created:"2026-06-13", shot:null },
-  { id:"BUG-1043", type:"bug", title:"Resume extraction toast never resolves",
-    desc:"'Extracting resume' toast stays pinned across reloads for the whole session; resume endpoint polls ~1/sec.",
-    module:"App-wide", severity:"high", status:"assigned", reporter:"joel@bits", assignee:"dev:Vishwas",
-    due:"2026-06-18", created:"2026-06-13", shot:null },
-  { id:"BUG-1044", type:"feature", title:"Add account deletion option",
-    desc:"No way to delete an account anywhere. Needed for data-protection compliance.",
-    module:"Settings", severity:"low", status:"reported", reporter:"guest:meera@gmail.com", assignee:"—",
-    due:"", created:"2026-06-15", shot:null },
-];
-let MEM = JSON.parse(JSON.stringify(seed));
+const supabase = window.supabase.createClient(
+ https://anuupbdmcqralxskdyur.supabase.co/rest/v1/
+
+,
+  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFudXVwYmRtY3FyYWx4c2tkeXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1OTk5NzIsImV4cCI6MjA5NzE3NTk3Mn0.sMVeXZ6ofakKAJUF3sHTq9ku9RVn0NDv6d8pcryAr2M
+
+);
+
 const api = {
-  list: async () => JSON.parse(JSON.stringify(MEM)),
-  add:  async (b) => { MEM = [b, ...MEM]; },
-  update: async (id, patch) => { MEM = MEM.map(b => b.id===id ? {...b, ...patch} : b); },
+  list:   async () => (await supabase.from("reports").select("*").order("created",{ascending:false})).data || [],
+  add:    async (b) => { await supabase.from("reports").insert(b); },
+  update: async (id, patch) => { await supabase.from("reports").update(patch).eq("id", id); },
 };
 
 /* ------------------------------------------------------------------ */
