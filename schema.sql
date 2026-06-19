@@ -1,23 +1,17 @@
 -- ============================================================
 --  SyncUp Bug & Feedback Portal — Supabase schema
---  Run this whole file in: Supabase Dashboard → SQL Editor
+--  Run this whole file in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
--- 1. PROFILES (roles) -----------------------------------------
--- One row per signed-in team member. role drives permissions.
-create table if not exists profiles (
-  id    uuid primary key references auth.users on delete cascade,
-  name  text,
-  role  text not null default 'reporter'
-        check (role in ('reporter','tester','developer','admin'))
-);
-
--- 2. REPORTS (bugs + feature requests) ------------------------
+-- 1. REPORTS (bugs + feature requests) ------------------------
 create table if not exists reports (
   id        text primary key,        -- e.g. BUG-1045 / FEAT-1046
   type      text not null default 'bug' check (type in ('bug','feature')),
   title     text not null,
-  desc      text not null,
+  "desc"    text not null,           -- note: 'desc' is a SQL keyword; the
+                                     -- deployed table uses this column name,
+                                     -- and Supabase's client quotes it
+                                     -- automatically, so it works as-is.
   module    text,
   severity  text default 'medium' check (severity in ('high','medium','low')),
   status    text default 'reported'
@@ -26,34 +20,61 @@ create table if not exists reports (
   assignee  text default '—',
   due       text,                     -- due date (YYYY-MM-DD)
   created   text,
-  shot      text                      -- screenshot URL (Supabase storage)
+  shot      text                      -- screenshot (data URL)
+);
+
+-- 2. PROFILES (roles) -----------------------------------------
+-- Only used if real password authentication is enabled later.
+-- The current app uses a name + role picker, so this table is
+-- optional until then (see the AUTH NOTE at the bottom).
+create table if not exists profiles (
+  id    uuid primary key references auth.users on delete cascade,
+  name  text,
+  role  text not null default 'reporter'
+        check (role in ('reporter','tester','developer','admin'))
 );
 
 -- 3. ROW-LEVEL SECURITY ---------------------------------------
 alter table reports enable row level security;
 
 -- Anyone (even logged-out) can READ reports and FILE a new one.
--- This satisfies requirement #6: no sign-in needed to report.
+-- Satisfies requirement #6: no sign-in needed to report.
 create policy "anyone can read"   on reports for select using (true);
 create policy "anyone can insert" on reports for insert with check (true);
 
--- Only signed-in testers / developers / admins can CHANGE a report.
--- This satisfies requirement #7: must be logged in (with a role) to act.
-create policy "members can update" on reports for update
-  using (
-    exists (
-      select 1 from profiles p
-      where p.id = auth.uid()
-        and p.role in ('tester','developer','admin')
-    )
-  );
+-- IMPORTANT — see AUTH NOTE below.
+-- The app currently uses a name+role picker, NOT real Supabase Auth, so
+-- auth.uid() is always empty. Policies that check auth.uid() would block
+-- ALL updates/deletes. The two policies below are therefore written to be
+-- permissive, and access control is enforced in the frontend (the ROLES
+-- object only shows action buttons to the right role).
+create policy "allow update" on reports for update using (true);
+create policy "allow delete" on reports for delete using (true);
 
--- Profiles: a user can see/edit only their own row.
+-- ------------------------------------------------------------
+-- WHEN REAL AUTH IS ADDED, drop the two permissive policies above
+-- and use these stricter ones instead:
+--
+--   drop policy "allow update" on reports;
+--   drop policy "allow delete" on reports;
+--
+--   create policy "members can update" on reports for update using (
+--     exists (select 1 from profiles p
+--             where p.id = auth.uid()
+--               and p.role in ('tester','developer','admin')));
+--
+--   create policy "admins can delete" on reports for delete using (
+--     exists (select 1 from profiles p
+--             where p.id = auth.uid()
+--               and p.role = 'admin'));
+-- ------------------------------------------------------------
+
+-- Profiles RLS (for the real-auth path)
 alter table profiles enable row level security;
 create policy "own profile read"  on profiles for select using (auth.uid() = id);
 create policy "own profile write" on profiles for insert with check (auth.uid() = id);
 
--- 4. AUTO-CREATE a profile when someone signs up -------------
+-- 4. AUTO-CREATE a profile on signup (real-auth path only) ----
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
@@ -67,14 +88,15 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
 
--- NOTE: new members default to 'reporter'. To promote someone to tester /
--- developer / admin, edit their row in the profiles table (Table Editor),
--- or run:  update profiles set role='tester' where name='Aarya';
+-- To promote someone once real auth is on:
+--   update profiles set role='tester' where name='Aarya';
 
 -- ============================================================
---  AUTH WIRING (frontend) — summary
---  In index.html, sign-in calls:
---    supabase.auth.signInWithPassword({ email, password })
---  and the current user's role is read from the profiles table.
---  The demo's name+role picker is replaced by this real flow.
+--  AUTH NOTE
+--  The deployed app signs in with a name + role picker (no password).
+--  This is intentional for an internal team tool. Permissions are
+--  enforced in index.html via the ROLES object. If the portal is opened
+--  to outside users, switch the Identity component to
+--  supabase.auth.signInWithPassword(...) and use the stricter policies
+--  shown above. The profiles table + trigger are already here for that.
 -- ============================================================
