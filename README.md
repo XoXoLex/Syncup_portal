@@ -1,114 +1,201 @@
 # SyncUp — Bug & Feedback Portal
 
-A bug reporting and tracking portal. Anyone can report a bug or request a
-feature (no account needed); testers, developers and admins sign in to move
-reports through a workflow.
+A bug reporting and tracking web app for the SyncUp platform. Anyone can report
+a bug or request a feature without an account; team members sign in with a role
+(tester, developer, admin) to move reports through a workflow. The app is built
+as a single self-contained React file, backed by Supabase (database + storage)
+and Resend (resolution emails), and deployed on Vercel.
 
-This folder contains a **working demo** (`index.html`) that runs in any browser
-with no setup — open it and click around. Data is held in memory, so it resets
-on refresh. The steps below turn it into a **real, deployed app** with login,
-a database, file uploads, and resolution emails.
+This document describes what the portal does, what has already been built and
+deployed, how it is structured, and what remains optional. It is intended as a
+handover reference for the team.
+
+---
+
+## Current status
+
+The portal is **built and live**. The following are complete and working in
+production:
+
+- Public bug/feature reporting form (no login required), with screenshot upload
+- Full status workflow with role-based permissions
+- Supabase database storing all reports
+- Admin-only delete (single report and clear-all)
+- Resolution emails via a Supabase Edge Function + Resend
+
+The **only** item not fully production-ready is email delivery to arbitrary
+addresses — see "Known limitation: email" below. Everything else is functional.
 
 ---
 
 ## What it does (the 7 requirements)
 
-| # | Requirement | Where it lives |
-|---|-------------|----------------|
-| 1 | Report a bug / request a feature | "New report" form (`type` = bug \| feature) |
-| 2 | Screenshot of the bug | File picker in the form (image upload) |
-| 3 | Roles: reporter, tester, developer, admin | Sign-in role selector + per-role action buttons |
-| 4 | Bug verified by testers | "Verify" action (tester/admin only) |
-| 5 | Assigned to developer with a timeline; overdue → notify admin + tester | "Assign to dev" sets assignee + due date; overdue rows flag and (when deployed) trigger an email |
-| 6 | No sign-in to report; email gets the update | Form takes an email; "resolved" queues the thank-you notification |
-| 7 | Tester must log in before assigning | Action buttons only appear when signed in with the right role |
+| # | Requirement | Status | Where it lives |
+|---|-------------|--------|----------------|
+| 1 | Report a bug / request a feature | Done | "New report" form (`type` = bug \| feature) |
+| 2 | Screenshot of the bug | Done | File picker in the form (image stored as data on the report) |
+| 3 | Roles: reporter, tester, developer, admin | Done | Sign-in role selector + per-role action buttons (`ROLES` object) |
+| 4 | Bug verified by testers | Done | "Verify" action (tester/admin only) |
+| 5 | Assigned to a developer with a timeline; overdue flagged | Done (in-app); overdue email optional | "Assign to dev" sets assignee + due date; overdue reports flagged in the UI |
+| 6 | No sign-in needed to report; reporter emailed on resolution | Done (sandbox email) | Form takes an email; resolving a report calls the email function |
+| 7 | Members must log in before acting | Done | Action buttons only render for a signed-in role with permission |
 
-**Lifecycle:** Reported → Verified → Assigned → In Progress → Resolved → Closed
-(any resolved/closed item can be Reopened).
-
----
-
-## Try the demo right now
-
-Double-click `index.html`. It opens in your browser. Click **Sign in to act**,
-pick a role, and the matching action buttons appear on each report. No internet
-or install needed.
-
-> The demo's login is just a name + role picker, and data resets on refresh.
-> That's intentional — it's for showing the flows. Real login and saved data
-> come from the steps below.
+**Lifecycle:** Reported → Verified → Assigned → In Progress → Resolved → Closed.
+Any resolved or closed report can be reopened; admins can delete any report.
 
 ---
 
-## Turning it into a real app (the deploy plan)
+## Architecture
 
-Three free services, no servers to manage:
+Three services, all on free tiers, no servers to maintain:
 
-1. **GitHub** — stores the code so the team can share it.
-2. **Supabase** — the database, real login, and screenshot storage.
-3. **Vercel** — hosts the website at a real URL.
+- **Vercel** — hosts the site and auto-redeploys whenever the GitHub repo
+  changes.
+- **Supabase** — Postgres database (the `reports` table), plus the Edge Function
+  that sends resolution emails.
+- **Resend** — the email API the Edge Function calls.
 
-### Step 1 — Put the code on GitHub
-1. Make a free account at github.com.
-2. Create a new repository called `syncup-bug-portal`.
-3. Upload the contents of this folder (the upload button works fine — no
-   command line needed).
+The entire frontend is one file, `index.html`. It loads React, Babel and the
+Supabase client from CDNs, so there is no build step — the file runs as-is.
 
-### Step 2 — Set up Supabase (database + auth + storage)
-1. Make a free account at supabase.com and create a project.
-2. Open the **SQL Editor** and run the script in `schema.sql` (in this folder).
-   It creates the `reports` table, the `profiles` (roles) table, and the
-   security rules that enforce requirement #7 (only signed-in testers/admins
-   can change things).
-3. Create a storage bucket named `screenshots` (public read).
-4. From **Project Settings → API**, copy the **Project URL** and the
-   **anon public key**.
-
-### Step 3 — Connect the app to Supabase
-In `index.html`, find the block marked `STORAGE LAYER`. Replace the four
-`api.*` functions with the Supabase versions below, and add the Supabase
-script tag in `<head>`:
-
-```html
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+```
+Browser (index.html on Vercel)
+        |
+        |-- reads/writes reports ----------> Supabase: reports table
+        |
+        '-- on "resolved" --> Supabase Edge Function (notify-resolved-md)
+                                      |
+                                      '----> Resend --> reporter's email
 ```
 
-```js
-const supabase = window.supabase.createClient(
-  "PASTE_PROJECT_URL_HERE",
-  "PASTE_ANON_KEY_HERE"
-);
-const api = {
-  list:   async () => (await supabase.from("reports").select("*").order("created",{ascending:false})).data || [],
-  add:    async (b) => { await supabase.from("reports").insert(b); },
-  update: async (id, patch) => { await supabase.from("reports").update(patch).eq("id", id); },
-};
-```
+---
 
-That's the only code change. Login wiring (Supabase Auth) and the email
-function are described in `schema.sql` comments and `email-function.md`.
+## How the code is organised (`index.html`)
 
-### Step 4 — Deploy on Vercel
-1. Make a free account at vercel.com.
-2. "Import" your GitHub repo.
-3. Click Deploy. You get a live URL like `syncup-bug-portal.vercel.app`.
+All logic is inside the single `<script type="text/babel">` block:
 
-Every time you push a change to GitHub, Vercel re-deploys automatically.
+- **Storage layer** (`const api = { ... }`) — the only place that talks to
+  Supabase. Functions: `list`, `add`, `update`, `remove`, `clear`. To repoint
+  the app at a different Supabase project, only the `createClient(...)` URL/key
+  and these functions matter.
+- **`ROLES`** — defines the four roles and the actions each one is allowed to
+  perform (`can: [...]`). Permissions are enforced by checking this array
+  before rendering each action button.
+- **`FLOW`, `STATUS`, `SEV`, `MODULES`** — the workflow stages, their colours,
+  severity levels, and the list of platform modules shown in the form.
+- **`Identity`** — the sign-in control (name + role picker). See the auth note
+  below.
+- **`ReportForm`** — the new-report modal (type, title, description, module,
+  severity, email, screenshot).
+- **`BugCard`** — one report row, its expandable detail, and the role-gated
+  action bar (Verify / Assign / Start work / Mark resolved / Close / Reopen /
+  Delete).
+- **`App`** — top-level state, the report list, search, status-filter tabs, and
+  the handlers (`submit`, `act`, `del`, `clearAll`).
 
 ---
 
-## What still needs a developer
+## Roles and permissions
 
-- **Real email sending** (requirements 5 & 6): needs a Supabase Edge Function
-  plus a free Resend account — see `email-function.md`. The app already
-  *queues* the message and shows it; this just makes it actually send.
-- **Overdue auto-check** (requirement 5): a scheduled Supabase function that
-  runs daily and emails admin + tester for any past-due, unresolved bug.
+| Role | Can do |
+|------|--------|
+| Reporter | File a report |
+| Tester | File, verify, reopen |
+| Developer | Start work, mark resolved |
+| Admin | Everything, including assign and delete |
+
+A logged-out visitor can read all reports and file a new one, but sees no action
+buttons.
+
+---
+
+## Database
+
+The schema lives in `schema.sql`. Running it in the Supabase SQL Editor creates:
+
+- The `reports` table (one row per bug/feature).
+- A `profiles` table for member roles (used only if real authentication is
+  enabled — see auth note).
+- Row-level security policies: anyone can read and insert (requirement 6),
+  members can update, admins can delete.
+
+To change what's stored or how it's secured, edit `schema.sql` and re-run the
+relevant statements.
+
+---
+
+## Authentication note (important for the team)
+
+The current sign-in is a **name + role picker**, not password-based login. A
+user types a name, chooses a role, and the matching permissions apply. This is
+fine for an internal team tool and was a deliberate choice to keep the portal
+simple and fast to ship.
+
+Because there is no real authenticated user, Supabase's `auth.uid()` is empty,
+so the row-level security policies that reference it (update/delete) are
+permissive in practice — access control is enforced in the frontend by the
+`ROLES` permissions. If the portal is ever opened to outside users, real
+authentication should be added:
+
+- Replace the `Identity` component's picker with
+  `supabase.auth.signInWithPassword({ email, password })`.
+- Read the signed-in user's role from the `profiles` table.
+- The `profiles` table and its auto-create trigger in `schema.sql` already
+  support this.
+
+---
+
+## Known limitation: email
+
+Resolution emails are wired and working, but currently send from Resend's
+sandbox sender (`onboarding@resend.dev`). On the sandbox, Resend only delivers
+to the account owner's own verified address — it will not yet deliver to
+arbitrary reporter emails.
+
+To remove this restriction, a domain (e.g. `syncup.in`) must be verified on the
+Resend account by adding the SPF/DKIM DNS records Resend provides, after which
+the Edge Function's `from` address is changed to that domain (e.g.
+`bugs@syncup.in`). This is a configuration change only — no code rewrite. Full
+steps are in `email-function.md`.
+
+The portal does not depend on email to function: every report and its status is
+visible to everyone on the live site. The email is only a courtesy notification.
+
+---
+
+## Maintenance / common tasks
+
+- **Set a teammate's role:** roles are chosen at sign-in, so no action is needed
+  for the current picker-based login. (Under real auth, update their row in the
+  `profiles` table.)
+- **Clear test data:** sign in as admin and use the per-report Delete button, or
+  "Clear all".
+- **Change the Supabase project:** update the `createClient(...)` URL and anon
+  key near the top of `index.html`.
+- **Redeploy:** push changes to the GitHub repo; Vercel redeploys automatically.
+
+---
+
+## If the portal needs to move to SyncUp-owned accounts
+
+The whole project is portable. To move it off the original developer's personal
+accounts:
+
+1. Create company-owned Supabase, Resend, and Vercel accounts.
+2. Run `schema.sql` in the new Supabase project; create a `screenshots` storage
+   bucket if file storage is moved there.
+3. Update the `createClient(...)` URL and anon key in `index.html`.
+4. Recreate the `notify-resolved-md` Edge Function (code in `email-function.md`)
+   and add the Resend API key as a secret.
+5. Re-import the GitHub repo into the new Vercel account and deploy.
+
+No code needs to be rewritten — only keys and accounts change.
 
 ---
 
 ## File list
-- `index.html` — the whole app (demo-ready; one block to swap for production)
-- `schema.sql` — database tables + security rules for Supabase
-- `email-function.md` — how to wire real resolution/overdue emails
+
+- `index.html` — the entire app (frontend + Supabase wiring + email trigger)
+- `schema.sql` — database tables and security policies
+- `email-function.md` — the Edge Function code and the domain-verification steps
 - `README.md` — this file
