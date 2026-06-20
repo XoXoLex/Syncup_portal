@@ -148,11 +148,13 @@ function ReportForm({onSubmit,onClose}){
         </div>
 
         <Label>Title</Label>
-        <input className="focus-ring" value={f.title} onChange={e=>set("title",e.target.value)} placeholder="Short summary of the issue"
+        <input className="focus-ring" value={f.title} onChange={e=>set("title",e.target.value)}
+          placeholder={f.type==="bug"?"Short summary of the bug":"Brief description of the feature you'd like"}
           style={inp}/>
         <Label>Description</Label>
         <textarea className="focus-ring" value={f.desc} onChange={e=>set("desc",e.target.value)} rows={4}
-          placeholder="What happens, where, and what you expected instead." style={{...inp,resize:"vertical"}}/>
+          placeholder={f.type==="bug"?"Steps to reproduce, what happens, and what you expected instead.":"Describe the feature, the problem it solves, and how you'd use it."}
+          style={{...inp,resize:"vertical"}}/>
         <div style={{display:"flex",gap:12}}>
           <div style={{flex:1}}>
             <Label>Module</Label>
@@ -160,12 +162,12 @@ function ReportForm({onSubmit,onClose}){
               {MODULES.map(m=><option key={m}>{m}</option>)}
             </select>
           </div>
-          <div style={{flex:1}}>
+          {f.type==="bug" && <div style={{flex:1}}>
             <Label>Severity</Label>
             <select className="focus-ring" value={f.severity} onChange={e=>set("severity",e.target.value)} style={{...inp,background:"#fff"}}>
               {Object.entries(SEV).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}
             </select>
-          </div>
+          </div>}
         </div>
         <Label>Your email</Label>
         <input className="focus-ring" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="you@example.com" style={inp}/>
