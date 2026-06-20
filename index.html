@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,29 +8,44 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --ink:#1f3a44; --ink-soft:#436572; --mut:#7c9aa3;
-    --bg:#eef6f5; --bg2:#e3f0ef; --panel:#ffffff;
-    --line:#d7e7e6; --line2:#c5dcdb;
-    --sea:#3fae9f; --sea-d:#2c8d80; --sky:#5aa6d6; --lav:#8e8fd6;
-    --sand:#e0b272; --coral:#e08a7a; --tint:#dcefe9;
+  :root,[data-theme="light"]{
+    --bg:#ffffff; --bg2:#fafafa; --panel:#ffffff;
+    --ink:#09090b; --ink-soft:#3f3f46; --mut:#71717a;
+    --line:#e4e4e7; --line2:#d4d4d8;
+    --primary:#18181b; --primary-fg:#fafafa;
+    --secondary:#f4f4f5; --secondary-fg:#18181b;
+    --destructive:#ef4444; --destructive-fg:#fafafa;
+    --accent:#f4f4f5; --accent-fg:#18181b;
+    --muted:#f4f4f5; --muted-fg:#71717a;
+    --ring:#a1a1aa;
+    --radius:6px;
+    --sev-high:#ef4444; --sev-medium:#f59e0b; --sev-low:#3b82f6;
+  }
+  [data-theme="dark"]{
+    --bg:#09090b; --bg2:#18181b; --panel:#09090b;
+    --ink:#fafafa; --ink-soft:#d4d4d8; --mut:#71717a;
+    --line:#27272a; --line2:#3f3f46;
+    --primary:#fafafa; --primary-fg:#18181b;
+    --secondary:#27272a; --secondary-fg:#fafafa;
+    --destructive:#ef4444; --destructive-fg:#fafafa;
+    --accent:#27272a; --accent-fg:#fafafa;
+    --muted:#27272a; --muted-fg:#a1a1aa;
+    --ring:#52525b;
+    --sev-high:#f87171; --sev-medium:#fbbf24; --sev-low:#60a5fa;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
-  .mono{font-family:'DM Mono',monospace}
-  .disp{font-family:'Fraunces',serif}
+  body{font-family:'Geist',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;transition:background .15s,color .15s}
+  .mono{font-family:'Geist Mono',monospace}
   button{font-family:inherit;cursor:pointer;border:none;background:none}
   input,textarea,select{font-family:inherit;font-size:14px}
-  ::placeholder{color:#a6bdc1}
-  .focus-ring:focus-visible{outline:2px solid var(--sea);outline-offset:2px}
-  .scroll::-webkit-scrollbar{width:10px;height:10px}
-  .scroll::-webkit-scrollbar-thumb{background:#cfe3e2;border-radius:20px;border:3px solid var(--bg)}
-  .row-hover:hover{background:#f5fbfa}
-  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .rise{animation:rise .22s ease both}
+  .focus-ring:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-family:'Geist Mono',monospace;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;font-weight:500;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}
+  tr:hover td{background:var(--accent)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -40,11 +55,11 @@
 const { useState, useEffect } = React;
 
 /* ------------------------------------------------------------------ *
- *  STORAGE LAYER  (unchanged — talks to Supabase)
+ *  STORAGE LAYER
  * ------------------------------------------------------------------ */
+// Hardcoded for testing — replace with proper Supabase project credentials in production
 const supabase = window.supabase.createClient(
- "https://anuupbdmcqralxskdyur.supabase.co"
-,
+ "https://anuupbdmcqralxskdyur.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFudXVwYmRtY3FyYWx4c2tkeXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1OTk5NzIsImV4cCI6MjA5NzE3NTk3Mn0.sMVeXZ6ofakKAJUF3sHTq9ku9RVn0NDv6d8pcryAr2M"
 );
 
@@ -61,210 +76,291 @@ const api = {
 
 /* ---------------- config ---------------- */
 const ROLES = {
-  reporter:  { label:"Reporter",  color:"var(--sky)",  can:["report"] },
-  tester:    { label:"Tester",    color:"var(--sea-d)",can:["report","verify","reopen"] },
-  developer: { label:"Developer", color:"var(--sand)", can:["progress","resolve"] },
-  admin:     { label:"Admin",     color:"var(--coral)",can:["report","verify","assign","progress","resolve","reopen","delete"] },
+  tester:    { label:"Tester",    can:["report","verify","close","reopen"] },
+  developer: { label:"Developer", can:["progress","resolve"] },
+  admin:     { label:"Admin",     can:["report","verify","assign","progress","resolve","close","reopen","delete"] },
 };
+
+// Hardcoded for testing — replace with proper auth (e.g. Supabase Auth) in production
+const USERS = {
+  "tester@syncup.com": { pwd:"tester123", name:"Tom Bradley",  role:"tester" },
+  "dev@syncup.com":    { pwd:"dev123",    name:"Dana Lin",     role:"developer" },
+  "admin@syncup.com":  { pwd:"admin123",  name:"Alex Morgan",  role:"admin" },
+};
+
 const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
 const STATUS = {
-  reported:   { label:"Reported",    c:"#5aa6d6", dot:"#5aa6d6" },
-  verified:   { label:"Verified",    c:"#3fae9f", dot:"#3fae9f" },
-  assigned:   { label:"Assigned",    c:"#8e8fd6", dot:"#8e8fd6" },
-  in_progress:{ label:"In Progress", c:"#d39a4e", dot:"#e0b272" },
-  resolved:   { label:"Resolved",    c:"#2c8d80", dot:"#2c8d80" },
-  closed:     { label:"Closed",      c:"#7c9aa3", dot:"#9fb6bb" },
+  reported:   { label:"Reported" },
+  verified:   { label:"Verified" },
+  assigned:   { label:"Assigned" },
+  in_progress:{ label:"In Progress" },
+  resolved:   { label:"Resolved" },
+  closed:     { label:"Closed" },
 };
-const SEV = { high:{l:"High",c:"#d9745f"}, medium:{l:"Medium",c:"#d39a4e"}, low:{l:"Low",c:"#5aa6d6"} };
+const SEV = { high:{l:"High",c:"var(--sev-high)"}, medium:{l:"Medium",c:"var(--sev-medium)"}, low:{l:"Low",c:"var(--sev-low)"} };
 const MODULES = ["Landing","Dashboard","Settings","Jobs","Connections","Profile","App-wide","Other"];
 
-/* ---------------- tiny UI atoms ---------------- */
-function Dot({c}){ return <span style={{width:7,height:7,borderRadius:9,background:c,display:"inline-block",flexShrink:0}}/>; }
-function Pill({c,bg,children}){
-  return <span className="mono" style={{fontSize:10.5,fontWeight:500,color:c,background:bg||c+"18",
-    padding:"3px 8px",borderRadius:6,letterSpacing:.2,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5}}>{children}</span>;
-}
-function StatusBadge({s}){
-  const st=STATUS[s];
-  return <Pill c={st.c}><Dot c={st.dot}/>{st.label}</Pill>;
-}
-function Act({c,onClick,children}){
-  return <button className="focus-ring" onClick={onClick}
-    style={{fontSize:12,fontWeight:600,color:c,background:c+"14",padding:"7px 12px",borderRadius:8,
-    border:"1px solid "+c+"33",transition:"all .12s",whiteSpace:"nowrap"}}
-    onMouseEnter={e=>{e.currentTarget.style.background=c;e.currentTarget.style.color="#fff";}}
-    onMouseLeave={e=>{e.currentTarget.style.background=c+"14";e.currentTarget.style.color=c;}}>{children}</button>;
+/* ---------------- reusable components (shadcn-style) ---------------- */
+function Btn({variant="default",size="default",children,style:sx,...rest}){
+  const base = {fontFamily:"inherit",fontWeight:500,fontSize:14,borderRadius:"var(--radius)",cursor:"pointer",
+    display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .12s",border:"none",whiteSpace:"nowrap"};
+  const sizes = {default:{padding:"8px 16px",fontSize:14},sm:{padding:"6px 12px",fontSize:13},xs:{padding:"4px 10px",fontSize:12}};
+  const variants = {
+    default:{background:"var(--primary)",color:"var(--primary-fg)"},
+    outline:{background:"transparent",color:"var(--ink)",border:"1px solid var(--line2)"},
+    ghost:{background:"transparent",color:"var(--ink)"},
+    destructive:{background:"var(--destructive)",color:"var(--destructive-fg)"},
+    secondary:{background:"var(--secondary)",color:"var(--secondary-fg)"},
+  };
+  return <button {...rest} style={{...base,...sizes[size]||sizes.default,...variants[variant]||variants.default,...sx}}>{children}</button>;
 }
 
-/* ---------- LOGIN / ROLE GATE ---------- */
-function Identity({me,setMe}){
-  const [open,setOpen]=useState(false);
-  const [name,setName]=useState("");
-  const [role,setRole]=useState("tester");
-  if(me){
-    return (
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{textAlign:"right",lineHeight:1.25}}>
-          <div style={{fontSize:13,fontWeight:600}}>{me.name}</div>
-          <div className="mono" style={{fontSize:10,color:ROLES[me.role].color,fontWeight:500,textTransform:"uppercase",letterSpacing:.6}}>{ROLES[me.role].label}</div>
-        </div>
-        <div style={{width:36,height:36,borderRadius:11,background:ROLES[me.role].color,color:"#fff",
-          display:"grid",placeItems:"center",fontWeight:700,fontSize:15}} className="disp">{me.name[0].toUpperCase()}</div>
-        <button className="focus-ring" onClick={()=>setMe(null)} style={{fontSize:12,color:"var(--mut)",padding:"7px 11px",border:"1px solid var(--line2)",borderRadius:9,background:"#fff"}}>Sign out</button>
-      </div>
-    );
-  }
+function Badge({variant="default",children,style:sx}){
+  const base = {fontFamily:"'Geist Mono',monospace",fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:"var(--radius)",
+    display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap"};
+  const variants = {
+    default:{background:"var(--primary)",color:"var(--primary-fg)"},
+    outline:{background:"transparent",color:"var(--ink)",border:"1px solid var(--line2)"},
+    secondary:{background:"var(--secondary)",color:"var(--secondary-fg)"},
+  };
+  return <span style={{...base,...variants[variant]||variants.default,...sx}}>{children}</span>;
+}
+
+function Card({children,style:sx,...rest}){
+  return <div {...rest} style={{background:"var(--panel)",border:"1px solid var(--line)",borderRadius:"var(--radius)",...sx}}>{children}</div>;
+}
+
+function Overlay({children,onClose}){
   return (
-    <div style={{position:"relative"}}>
-      <button className="focus-ring" onClick={()=>setOpen(o=>!o)} style={{fontSize:13,fontWeight:600,color:"#fff",background:"var(--sea-d)",padding:"10px 17px",borderRadius:10,boxShadow:"0 2px 8px rgba(44,141,128,.25)"}}>Sign in</button>
-      {open && (
-        <div className="rise" style={{position:"absolute",right:0,top:48,width:268,background:"#fff",border:"1px solid var(--line)",
-          borderRadius:14,padding:18,boxShadow:"0 16px 48px rgba(31,58,68,.18)",zIndex:50}}>
-          <div className="disp" style={{fontSize:16,fontWeight:600,marginBottom:12}}>Sign in to act</div>
-          <input className="focus-ring" value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"
-            style={{width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:10,marginBottom:9}}/>
-          <select className="focus-ring" value={role} onChange={e=>setRole(e.target.value)}
-            style={{width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:10,marginBottom:13,background:"#fff",color:"var(--ink)"}}>
-            {Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-          </select>
-          <button className="focus-ring" disabled={!name.trim()} onClick={()=>{setMe({name:name.trim(),role});setOpen(false);}}
-            style={{width:"100%",padding:"11px",background:name.trim()?"var(--sea-d)":"#b6cdca",color:"#fff",borderRadius:10,fontWeight:600,fontSize:13}}>Continue</button>
-          <p style={{fontSize:11,color:"var(--mut)",marginTop:11,lineHeight:1.45}}>Testers, developers and admins sign in to act on tickets. Reporting a ticket needs no account.</p>
-        </div>
-      )}
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"grid",placeItems:"center",zIndex:100,padding:16}}>
+      <Card onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,padding:"24px",maxHeight:"90vh",overflow:"auto"}}>{children}</Card>
     </div>
   );
 }
 
-/* ---------- REPORT FORM ---------- */
-const inp={width:"100%",padding:"11px 13px",border:"1px solid var(--line2)",borderRadius:10,marginBottom:14,color:"var(--ink)"};
-function Label({children}){return <div className="mono" style={{fontSize:10.5,fontWeight:500,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.7,marginBottom:7}}>{children}</div>;}
+function Toast({msg}){
+  return (
+    <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",
+      background:"var(--primary)",color:"var(--primary-fg)",padding:"12px 20px",borderRadius:"var(--radius)",
+      fontSize:14,fontWeight:500,boxShadow:"0 4px 12px rgba(0,0,0,.15)",maxWidth:"90vw",zIndex:200}}>{msg}</div>
+  );
+}
 
-function ReportForm({onSubmit,onClose}){
+function Separator(){
+  return <div style={{height:1,background:"var(--line)",margin:"16px 0"}}/>;
+}
+
+function StatusBadge({s}){
+  return <Badge variant="outline">{STATUS[s].label}</Badge>;
+}
+
+function ThemeToggle(){
+  const [dark,setDark]=useState(document.documentElement.getAttribute("data-theme")==="dark");
+  const toggle=()=>{const next=!dark;setDark(next);document.documentElement.setAttribute("data-theme",next?"dark":"light");};
+  return <Btn variant="ghost" size="sm" onClick={toggle} style={{fontSize:16,padding:"6px 10px"}}>{dark?"☀":"☾"}</Btn>;
+}
+
+/* ---------- STAFF LOGIN MODAL ---------- */
+function StaffLoginModal({onLogin,onClose}){
+  const [email,setEmail]=useState("");
+  const [pwd,setPwd]=useState("");
+  const [err,setErr]=useState("");
+  const attempt=()=>{
+    const u=USERS[email.trim().toLowerCase()];
+    if(!u){setErr("Unknown email");return;}
+    if(u.pwd!==pwd){setErr("Wrong password");return;}
+    onLogin({name:u.name,role:u.role});
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{fontSize:18,fontWeight:600,marginBottom:4}}>Staff Sign In</div>
+      <div style={{fontSize:13,color:"var(--mut)",marginBottom:20}}>Tester, developer, and admin accounts only.</div>
+      <div style={{marginBottom:12}}>
+        <div className="mono" style={{fontSize:11,color:"var(--mut)",marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Email</div>
+        <input className="focus-ring" value={email} onChange={e=>setEmail(e.target.value)}
+          style={{width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",background:"var(--bg)",color:"var(--ink)"}}/>
+      </div>
+      <div style={{marginBottom:16}}>
+        <div className="mono" style={{fontSize:11,color:"var(--mut)",marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Password</div>
+        <input className="focus-ring" type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter")attempt();}}
+          style={{width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",background:"var(--bg)",color:"var(--ink)"}}/>
+      </div>
+      {err && <div style={{fontSize:13,color:"var(--destructive)",marginBottom:12}}>{err}</div>}
+      <Btn onClick={attempt} style={{width:"100%"}}>Sign In</Btn>
+    </Overlay>
+  );
+}
+
+/* ---------- TICKET FORM MODAL ---------- */
+function TicketFormModal({onSubmit,onClose}){
   const [f,setF]=useState({type:"bug",title:"",desc:"",module:"Settings",severity:"medium",email:"",shot:null});
   const set=(k,v)=>setF(s=>({...s,[k]:v}));
   const pick=(e)=>{const file=e.target.files[0]; if(!file)return;
     const r=new FileReader(); r.onload=()=>set("shot",r.result); r.readAsDataURL(file);};
   const ok = f.title.trim() && f.desc.trim() && f.email.trim();
+  const isBug = f.type==="bug";
+  const labelStyle = {fontFamily:"'Geist Mono',monospace",fontSize:11,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.5,marginBottom:6};
+  const inputStyle = {width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",marginBottom:14,color:"var(--ink)",background:"var(--bg)"};
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(31,58,68,.42)",backdropFilter:"blur(3px)",display:"grid",placeItems:"center",zIndex:100,padding:16}} onClick={onClose}>
-      <div className="rise scroll" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:580,background:"#fff",borderRadius:20,padding:"28px 30px",maxHeight:"90vh",overflow:"auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-          <div>
-            <div className="disp" style={{fontSize:23,fontWeight:600}}>New ticket</div>
-            <div style={{fontSize:13,color:"var(--mut)",marginTop:3}}>No account needed — you'll be emailed when it's resolved.</div>
-          </div>
-          <button className="focus-ring" onClick={onClose} style={{fontSize:20,color:"var(--mut)",width:34,height:34,borderRadius:10,background:"var(--bg)"}}>×</button>
+    <Overlay onClose={onClose}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:600}}>New ticket</div>
+          <div style={{fontSize:13,color:"var(--mut)",marginTop:4}}>No account needed.</div>
         </div>
-
-        <div style={{display:"flex",gap:9,marginBottom:18}}>
-          {[["bug","🐞","Bug"],["feature","✦","Feature"]].map(([t,ic,lbl])=>(
-            <button key={t} className="focus-ring" onClick={()=>set("type",t)}
-              style={{flex:1,padding:"12px",borderRadius:12,fontWeight:600,fontSize:13.5,transition:"all .12s",
-              border:"1.5px solid "+(f.type===t?"var(--sea)":"var(--line2)"),
-              background:f.type===t?"var(--tint)":"#fff",color:f.type===t?"var(--sea-d)":"var(--mut)"}}>
-              {ic}  {lbl}
-            </button>
-          ))}
+        <Btn variant="ghost" size="xs" onClick={onClose} style={{fontSize:18}}>×</Btn>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:18}}>
+        {[["bug","Bug"],["feature","Feature"]].map(([t,lbl])=>(
+          <Btn key={t} variant={f.type===t?"default":"outline"} size="sm" onClick={()=>set("type",t)} style={{flex:1}}>{lbl}</Btn>
+        ))}
+      </div>
+      <div style={labelStyle}>Title</div>
+      <input className="focus-ring" value={f.title} onChange={e=>set("title",e.target.value)} style={inputStyle}/>
+      <div style={labelStyle}>Description</div>
+      <textarea className="focus-ring" value={f.desc} onChange={e=>set("desc",e.target.value)} rows={4} style={{...inputStyle,resize:"vertical"}}/>
+      <div style={{display:"flex",gap:12}}>
+        <div style={{flex:1}}>
+          <div style={labelStyle}>Module</div>
+          <select className="focus-ring" value={f.module} onChange={e=>set("module",e.target.value)} style={{...inputStyle,background:"var(--bg)"}}>
+            {MODULES.map(m=><option key={m}>{m}</option>)}
+          </select>
         </div>
-
-        <Label>Title</Label>
-        <input className="focus-ring" value={f.title} onChange={e=>set("title",e.target.value)} placeholder="Short summary of the issue" style={inp}/>
-        <Label>Description</Label>
-        <textarea className="focus-ring" value={f.desc} onChange={e=>set("desc",e.target.value)} rows={4}
-          placeholder="What happens, where, and what you expected instead." style={{...inp,resize:"vertical"}}/>
-        <div style={{display:"flex",gap:13}}>
+        {isBug && (
           <div style={{flex:1}}>
-            <Label>Module</Label>
-            <select className="focus-ring" value={f.module} onChange={e=>set("module",e.target.value)} style={{...inp,background:"#fff"}}>
-              {MODULES.map(m=><option key={m}>{m}</option>)}
-            </select>
-          </div>
-          <div style={{flex:1}}>
-            <Label>Severity</Label>
-            <select className="focus-ring" value={f.severity} onChange={e=>set("severity",e.target.value)} style={{...inp,background:"#fff"}}>
+            <div style={labelStyle}>Severity</div>
+            <select className="focus-ring" value={f.severity} onChange={e=>set("severity",e.target.value)} style={{...inputStyle,background:"var(--bg)"}}>
               {Object.entries(SEV).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}
             </select>
           </div>
-        </div>
-        <Label>Your email</Label>
-        <input className="focus-ring" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="you@example.com" style={inp}/>
-        <Label>Screenshot (optional)</Label>
-        <input className="focus-ring" type="file" accept="image/*" onChange={pick} style={{fontSize:13,marginBottom:6}}/>
-        {f.shot && <img src={f.shot} alt="preview" style={{maxWidth:"100%",borderRadius:11,border:"1px solid var(--line)",marginTop:8}}/>}
-
-        <button className="focus-ring" disabled={!ok} onClick={()=>onSubmit(f)}
-          style={{width:"100%",marginTop:22,padding:"14px",borderRadius:12,fontWeight:700,fontSize:14.5,
-          background:ok?"var(--sea-d)":"#b6cdca",color:"#fff",boxShadow:ok?"0 3px 12px rgba(44,141,128,.3)":"none"}}>
-          Submit ticket
-        </button>
+        )}
       </div>
+      <div style={labelStyle}>Your email</div>
+      <input className="focus-ring" value={f.email} onChange={e=>set("email",e.target.value)} style={inputStyle}/>
+      <div style={labelStyle}>Screenshot (optional)</div>
+      <input className="focus-ring" type="file" accept="image/*" onChange={pick} style={{fontSize:13,marginBottom:6}}/>
+      {f.shot && <img src={f.shot} alt="preview" style={{maxWidth:"100%",borderRadius:"var(--radius)",border:"1px solid var(--line)",marginTop:8}}/>}
+      <Btn disabled={!ok} onClick={()=>onSubmit({...f,severity:isBug?f.severity:"medium"})} style={{width:"100%",marginTop:20,opacity:ok?1:.5}}>Submit ticket</Btn>
+    </Overlay>
+  );
+}
+
+/* ---------- REPORTER VIEW (public, read-only) ---------- */
+function ReporterView({bugs,onNewTicket}){
+  const active = bugs.filter(b=>b.status!=="closed");
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 24px",borderBottom:"1px solid var(--line)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:32,height:32,borderRadius:"var(--radius)",background:"var(--primary)",color:"var(--primary-fg)",
+            display:"grid",placeItems:"center",fontWeight:700,fontSize:15}}>S</div>
+          <span style={{fontWeight:600,fontSize:16}}>SyncUp Ticket Desk</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <ThemeToggle/>
+          <Btn variant="outline" size="sm" onClick={()=>document.getElementById("staff-login-trigger").click()}>Staff</Btn>
+        </div>
+      </header>
+      <main style={{flex:1,padding:"32px 24px",maxWidth:960,margin:"0 auto",width:"100%"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <h1 style={{fontSize:24,fontWeight:600}}>Active Tickets</h1>
+            <p style={{fontSize:13,color:"var(--mut)",marginTop:4}}>{active.length} open {active.length===1?"ticket":"tickets"}</p>
+          </div>
+          <Btn onClick={onNewTicket}>New ticket</Btn>
+        </div>
+        <Card>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Module</th>
+              </tr>
+            </thead>
+            <tbody>
+              {active.length===0
+                ? <tr><td colSpan={4} style={{textAlign:"center",padding:"40px",color:"var(--mut)"}}>No active tickets.</td></tr>
+                : active.map(b=>(
+                    <tr key={b.id}>
+                      <td className="mono" style={{fontSize:12,color:"var(--mut)",whiteSpace:"nowrap"}}>{b.id}</td>
+                      <td style={{fontWeight:500}}>{b.title}</td>
+                      <td style={{fontSize:13,color:"var(--ink-soft)",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.desc}</td>
+                      <td className="mono" style={{fontSize:12,color:"var(--mut)"}}>{b.module}</td>
+                    </tr>
+                  ))
+              }
+            </tbody>
+          </table>
+        </Card>
+      </main>
     </div>
   );
 }
 
-/* ---------- TICKET ROW ---------- */
+/* ---------- TICKET ROW (staff view) ---------- */
 function TicketRow({b,me,onAct,onDelete,expanded,onToggle}){
-  const overdue = b.due && b.status!=="resolved" && b.status!=="closed" && new Date(b.due) < new Date("2026-06-16");
-  const can = me ? ROLES[me.role].can : [];
+  const overdue = b.due && b.status!=="resolved" && b.status!=="closed" && new Date(b.due) < new Date();
+  const can = ROLES[me.role].can;
+  const isBug = b.type==="bug";
   return (
-    <div style={{borderBottom:"1px solid var(--line)",background:expanded?"#f5fbfa":"transparent"}}>
-      {/* compact row */}
-      <div className="row-hover" onClick={onToggle} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 22px",cursor:"pointer"}}>
-        <span className="mono" style={{fontSize:11.5,color:"var(--mut)",fontWeight:500,width:74,flexShrink:0}}>{b.id}</span>
-        <div style={{flexShrink:0}}><StatusBadge s={b.status}/></div>
-        <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:9}}>
-          {b.type==="feature" && <span title="Feature request" style={{color:"var(--lav)",fontSize:13,flexShrink:0}}>✦</span>}
-          <span className="disp" style={{fontSize:15,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</span>
-          {overdue && <Pill c="#fff" bg="var(--coral)">overdue</Pill>}
-        </div>
-        <span style={{fontSize:11.5,color:"var(--ink-soft)",flexShrink:0}} className="mono">{b.module}</span>
-        <span style={{width:9,height:9,borderRadius:9,background:SEV[b.severity].c,flexShrink:0}} title={SEV[b.severity].l+" severity"}/>
-        <span style={{fontSize:18,color:"var(--mut)",flexShrink:0,transition:"transform .15s",transform:expanded?"rotate(90deg)":"none",lineHeight:1}}>›</span>
-      </div>
-
-      {/* expanded detail */}
+    <>
+      <tr onClick={onToggle} style={{cursor:"pointer"}}>
+        <td className="mono" style={{fontSize:12,color:"var(--mut)",whiteSpace:"nowrap"}}>{b.id}</td>
+        <td><StatusBadge s={b.status}/></td>
+        <td style={{fontWeight:500}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
+            {!isBug && <Badge variant="secondary" style={{fontSize:10}}>Feature</Badge>}
+            {b.title}
+            {overdue && <Badge variant="default" style={{background:"var(--destructive)",color:"var(--destructive-fg)",fontSize:10}}>overdue</Badge>}
+          </span>
+        </td>
+        <td className="mono" style={{fontSize:12,color:"var(--mut)"}}>{b.module}</td>
+        {isBug && <td><span style={{width:8,height:8,borderRadius:8,background:SEV[b.severity]?.c||"var(--mut)",display:"inline-block"}} title={SEV[b.severity]?.l}/></td>}
+        {!isBug && <td/>}
+        <td style={{fontSize:16,color:"var(--mut)",transition:"transform .15s",transform:expanded?"rotate(90deg)":"none",textAlign:"center",width:40}}>›</td>
+      </tr>
       {expanded && (
-        <div className="rise" style={{padding:"4px 22px 22px 22px"}}>
-          <div style={{display:"flex",gap:18,fontSize:12,color:"var(--ink-soft)",flexWrap:"wrap",marginBottom:14}}>
-            <span>👤 {b.reporter}</span>
-            {b.assignee!=="—" && <span>🛠 {b.assignee}</span>}
-            {b.due && <span>⏱ due {b.due}</span>}
-            <span><Pill c={SEV[b.severity].c}>{SEV[b.severity].l}</Pill></span>
-          </div>
-          <p style={{fontSize:14,lineHeight:1.6,color:"var(--ink)",marginBottom:b.shot?14:0,maxWidth:680}}>{b.desc}</p>
-          {b.shot && <img src={b.shot} alt="" style={{maxWidth:"100%",borderRadius:12,border:"1px solid var(--line)"}}/>}
-
-          {/* ACTION BAR — role gated (logic unchanged) */}
-          <div style={{display:"flex",gap:9,flexWrap:"wrap",marginTop:16}}>
-            {!me && <span style={{fontSize:12.5,color:"var(--mut)",fontStyle:"italic"}}>Sign in as a tester, developer or admin to act on this ticket.</span>}
-            {can.includes("verify") && b.status==="reported" &&
-              <Act c="#2c8d80" onClick={(e)=>{e.stopPropagation();onAct(b.id,{status:"verified"})}}>✓ Verify</Act>}
-            {can.includes("assign") && b.status==="verified" &&
-              <Act c="#8e8fd6" onClick={(e)=>{e.stopPropagation();const who=prompt("Assign to developer (name):"); if(who){const due=prompt("Timeline / due date (YYYY-MM-DD):","2026-06-20"); onAct(b.id,{status:"assigned",assignee:"dev:"+who,due:due||""});}}}>→ Assign to dev</Act>}
-            {can.includes("progress") && b.status==="assigned" &&
-              <Act c="#d39a4e" onClick={(e)=>{e.stopPropagation();onAct(b.id,{status:"in_progress"})}}>▶ Start work</Act>}
-            {can.includes("resolve") && (b.status==="in_progress"||b.status==="assigned") &&
-              <Act c="#2c8d80" onClick={(e)=>{e.stopPropagation();onAct(b.id,{status:"resolved"})}}>✓ Mark resolved</Act>}
-            {can.includes("verify") && b.status==="resolved" &&
-              <Act c="#7c9aa3" onClick={(e)=>{e.stopPropagation();onAct(b.id,{status:"closed"})}}>Close</Act>}
-            {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
-              <Act c="#d9745f" onClick={(e)=>{e.stopPropagation();onAct(b.id,{status:"reported",assignee:"—",due:""})}}>↺ Reopen</Act>}
-            {can.includes("delete") &&
-              <Act c="#b5524a" onClick={(e)=>{e.stopPropagation();if(confirm("Delete "+b.id+" permanently? This cannot be undone.")) onDelete(b.id);}}>🗑 Delete</Act>}
-          </div>
-
-          {b.status==="resolved" &&
-            <div style={{marginTop:12,fontSize:12,color:"var(--sea-d)",background:"var(--tint)",padding:"9px 12px",borderRadius:9,maxWidth:680}}>
-              ✉ Notification queued to {b.reporter.replace("guest:","")}: "Your ticket has been resolved — thank you for letting us know."
-            </div>}
-          {overdue &&
-            <div style={{marginTop:12,fontSize:12,color:"#c2604f",background:"#e08a7a18",padding:"9px 12px",borderRadius:9,maxWidth:680}}>
-              ⚠ Past its timeline — admin and tester would be notified automatically.
-            </div>}
-        </div>
+        <tr>
+          <td colSpan={6} style={{padding:"12px 16px 20px",background:"var(--muted)"}}>
+            <div style={{display:"flex",gap:16,fontSize:12,color:"var(--ink-soft)",flexWrap:"wrap",marginBottom:12}}>
+              <span>Reporter: {b.reporter}</span>
+              {b.assignee && b.assignee!=="—" && <span>Assigned: {b.assignee}</span>}
+              {b.due && <span>Due: {b.due}</span>}
+              {isBug && <span>Severity: {SEV[b.severity]?.l||b.severity}</span>}
+            </div>
+            <p style={{fontSize:14,lineHeight:1.6,color:"var(--ink)",marginBottom:b.shot?12:0,maxWidth:680}}>{b.desc}</p>
+            {b.shot && <img src={b.shot} alt="" style={{maxWidth:"100%",borderRadius:"var(--radius)",border:"1px solid var(--line)",marginTop:8}}/>}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
+              {can.includes("verify") && b.status==="reported" &&
+                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"verified"})}}>Verify</Btn>}
+              {can.includes("assign") && b.status==="verified" &&
+                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();const who=prompt("Assign to developer (name):"); if(who){const dd=new Date();dd.setDate(dd.getDate()+7);const due=prompt("Timeline / due date (YYYY-MM-DD):",dd.toISOString().slice(0,10)); onAct(b.id,{status:"assigned",assignee:"dev:"+who,due:due||""});}}}>Assign</Btn>}
+              {can.includes("progress") && b.status==="assigned" &&
+                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"in_progress"})}}>Start work</Btn>}
+              {can.includes("resolve") && (b.status==="in_progress"||b.status==="assigned") &&
+                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"resolved"})}}>Resolve</Btn>}
+              {can.includes("close") && b.status==="resolved" &&
+                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"closed"})}}>Close</Btn>}
+              {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
+                <Btn variant="destructive" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"reported",assignee:"—",due:""})}}>Reopen</Btn>}
+              {can.includes("delete") &&
+                <Btn variant="destructive" size="xs" onClick={e=>{e.stopPropagation();if(confirm("Delete "+b.id+" permanently?")) onDelete(b.id);}}>Delete</Btn>}
+            </div>
+            {b.status==="resolved" &&
+              <div style={{marginTop:12,fontSize:12,color:"var(--ink-soft)",background:"var(--muted)",padding:"8px 12px",borderRadius:"var(--radius)",maxWidth:680}}>
+                Notification queued to {b.reporter.replace("guest:","")}: "Your ticket has been resolved."
+              </div>}
+            {overdue &&
+              <div style={{marginTop:12,fontSize:12,color:"var(--destructive)",background:"var(--muted)",padding:"8px 12px",borderRadius:"var(--radius)",maxWidth:680}}>
+                Past its timeline — admin and tester would be notified.
+              </div>}
+          </td>
+        </tr>
       )}
-    </div>
+    </>
   );
 }
 
@@ -273,6 +369,7 @@ function App(){
   const [bugs,setBugs]=useState([]);
   const [me,setMe]=useState(null);
   const [showForm,setShowForm]=useState(false);
+  const [showLogin,setShowLogin]=useState(false);
   const [filter,setFilter]=useState("all");
   const [q,setQ]=useState("");
   const [toast,setToast]=useState(null);
@@ -282,14 +379,17 @@ function App(){
   useEffect(()=>{load();},[]);
 
   const submit=async(f)=>{
-    const n=(1045+bugs.filter(b=>b.id.startsWith("BUG")).length);
-    const b={ id:(f.type==="feature"?"FEAT-":"BUG-")+n, type:f.type, title:f.title.trim(), desc:f.desc.trim(),
+    const prefix = f.type==="feature"?"FEAT-":"BUG-";
+    // Hardcoded for testing — replace with proper ID generation in production
+    const n = 1045 + bugs.filter(b=>b.id.startsWith(prefix)).length;
+    const b={ id:prefix+n, type:f.type, title:f.title.trim(), desc:f.desc.trim(),
       module:f.module, severity:f.severity, status:"reported", reporter:"guest:"+f.email.trim(),
-      assignee:"—", due:"", created:"2026-06-16", shot:f.shot };
+      assignee:"—", due:"", created:new Date().toISOString().slice(0,10), shot:f.shot };
     await api.add(b); await load(); setShowForm(false);
-    setToast("Ticket submitted — thank you! We'll email "+f.email.trim()+" on resolution.");
+    setToast("Ticket submitted — we'll email "+f.email.trim()+" on resolution.");
     setTimeout(()=>setToast(null),4200);
   };
+
   const act = async (id, patch) => {
     await api.update(id, patch);
     await load();
@@ -297,71 +397,74 @@ function App(){
       setToast("Updated " + id + " → " + STATUS[patch.status].label);
       setTimeout(() => setToast(null), 2600);
     }
-    // Trigger the email if marked resolved
     if(patch.status === "resolved") {
       const targetBug = bugs.find(b => b.id === id);
       const reporterEmail = targetBug.reporter.replace("guest:", "");
+      // Hardcoded for testing — replace with proper notification endpoint in production
       await fetch("https://anuupbdmcqralxskdyur.supabase.co/functions/v1/notify-resolved-md", {
         method: "POST",
         body: JSON.stringify({ email: reporterEmail, reportId: targetBug.id, title: targetBug.title }),
       });
     }
   };
+
   const del = async (id) => { await api.remove(id); await load();
     setToast("Deleted "+id); setTimeout(()=>setToast(null),2400); };
-  const clearAll = async () => { if(!confirm("Delete ALL tickets permanently? This cannot be undone.")) return;
+  const clearAll = async () => { if(!confirm("Delete ALL tickets permanently?")) return;
     await api.clear(); await load(); setToast("All tickets cleared"); setTimeout(()=>setToast(null),2600); };
 
+  /* --- Reporter (not logged in) --- */
+  if(!me){
+    return (
+      <>
+        <ReporterView bugs={bugs} onNewTicket={()=>setShowForm(true)}/>
+        <button id="staff-login-trigger" style={{display:"none"}} onClick={()=>setShowLogin(true)}/>
+        {showLogin && <StaffLoginModal onLogin={u=>{setMe(u);setShowLogin(false);}} onClose={()=>setShowLogin(false)}/>}
+        {showForm && <TicketFormModal onSubmit={submit} onClose={()=>setShowForm(false)}/>}
+        {toast && <Toast msg={toast}/>}
+      </>
+    );
+  }
+
+  /* --- Staff (logged in) --- */
   const counts = FLOW.reduce((a,s)=>{a[s]=bugs.filter(b=>b.status===s).length;return a;},{});
-  const open = bugs.filter(b=>b.status!=="resolved"&&b.status!=="closed").length;
+  const openCount = bugs.filter(b=>b.status!=="resolved"&&b.status!=="closed").length;
   const shown = bugs.filter(b=>{
     const mf = filter==="all"||b.status===filter;
     const mq = !q || (b.title+b.desc+b.id+b.module).toLowerCase().includes(q.toLowerCase());
     return mf&&mq;
   });
 
-  const navItem = (key,label,n,dot)=>(
-    <button key={key} className="focus-ring" onClick={()=>setFilter(key)}
-      style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 12px",borderRadius:10,
-      background:filter===key?"#fff":"transparent",
-      boxShadow:filter===key?"0 1px 4px rgba(31,58,68,.07)":"none",
-      color:filter===key?"var(--ink)":"var(--ink-soft)",fontWeight:filter===key?600:500,fontSize:13.5,textAlign:"left"}}>
-      {dot ? <Dot c={dot}/> : <span style={{width:7}}/>}
-      <span style={{flex:1}}>{label}</span>
-      <span className="mono" style={{fontSize:11,color:"var(--mut)"}}>{n}</span>
-    </button>
-  );
-
   return (
     <div style={{display:"flex",minHeight:"100vh"}}>
-      {/* ---------------- SIDEBAR ---------------- */}
-      <aside style={{width:248,background:"var(--bg2)",borderRight:"1px solid var(--line)",
-        padding:"22px 16px",display:"flex",flexDirection:"column",gap:6,position:"sticky",top:0,height:"100vh"}}>
-        <div style={{display:"flex",alignItems:"center",gap:11,padding:"0 6px 18px"}}>
-          <div style={{width:38,height:38,borderRadius:12,background:"linear-gradient(135deg,var(--sea),var(--sky))",
-            display:"grid",placeItems:"center",boxShadow:"0 3px 10px rgba(63,174,159,.3)"}}>
-            <span className="disp" style={{color:"#fff",fontWeight:700,fontSize:19}}>S</span>
-          </div>
+      {/* SIDEBAR */}
+      <aside style={{width:240,background:"var(--bg2)",borderRight:"1px solid var(--line)",
+        padding:"20px 14px",display:"flex",flexDirection:"column",gap:4,position:"sticky",top:0,height:"100vh"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 6px 16px"}}>
+          <div style={{width:32,height:32,borderRadius:"var(--radius)",background:"var(--primary)",color:"var(--primary-fg)",
+            display:"grid",placeItems:"center",fontWeight:700,fontSize:15}}>S</div>
           <div style={{lineHeight:1.2}}>
-            <div className="disp" style={{fontSize:16,fontWeight:600}}>Ticket Desk</div>
-            <div className="mono" style={{fontSize:9.5,color:"var(--mut)",letterSpacing:.3}}>SyncUp · feedback</div>
+            <div style={{fontSize:15,fontWeight:600}}>Ticket Desk</div>
+            <div className="mono" style={{fontSize:10,color:"var(--mut)",letterSpacing:.3}}>SyncUp</div>
           </div>
         </div>
 
-        <button className="focus-ring" onClick={()=>setShowForm(true)}
-          style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-          background:"var(--sea-d)",color:"#fff",fontWeight:600,fontSize:13.5,padding:"11px",borderRadius:11,marginBottom:14,
-          boxShadow:"0 3px 10px rgba(44,141,128,.28)"}}>
-          <span style={{fontSize:16,lineHeight:1}}>+</span> New ticket
-        </button>
+        <Btn onClick={()=>setShowForm(true)} style={{marginBottom:12,width:"100%"}}>+ New ticket</Btn>
 
         <div className="mono" style={{fontSize:10,color:"var(--mut)",letterSpacing:.8,padding:"0 8px 4px",textTransform:"uppercase"}}>Queues</div>
-        {navItem("all","All tickets",bugs.length,null)}
-        {FLOW.map(s=>navItem(s,STATUS[s].label,counts[s],STATUS[s].dot))}
+        {[{key:"all",label:"All tickets",n:bugs.length},...FLOW.map(s=>({key:s,label:STATUS[s].label,n:counts[s]}))].map(item=>(
+          <button key={item.key} className="focus-ring" onClick={()=>setFilter(item.key)}
+            style={{display:"flex",alignItems:"center",width:"100%",padding:"8px 12px",borderRadius:"var(--radius)",
+            background:filter===item.key?"var(--accent)":"transparent",
+            color:filter===item.key?"var(--ink)":"var(--ink-soft)",fontWeight:filter===item.key?600:400,fontSize:13,textAlign:"left"}}>
+            <span style={{flex:1}}>{item.label}</span>
+            <span className="mono" style={{fontSize:11,color:"var(--mut)"}}>{item.n}</span>
+          </button>
+        ))}
 
         <div style={{marginTop:"auto",padding:"14px 10px 4px",borderTop:"1px solid var(--line)"}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--ink-soft)",marginBottom:5}}>
-            <span>Open</span><span className="mono" style={{fontWeight:600,color:"var(--sea-d)"}}>{open}</span>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--ink-soft)",marginBottom:4}}>
+            <span>Open</span><span className="mono" style={{fontWeight:600}}>{openCount}</span>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--ink-soft)"}}>
             <span>Resolved</span><span className="mono" style={{fontWeight:600}}>{counts.resolved+counts.closed}</span>
@@ -369,61 +472,58 @@ function App(){
         </div>
       </aside>
 
-      {/* ---------------- MAIN ---------------- */}
+      {/* MAIN */}
       <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column"}}>
-        {/* topbar */}
-        <header style={{display:"flex",alignItems:"center",gap:14,padding:"15px 26px",borderBottom:"1px solid var(--line)",background:"rgba(255,255,255,.7)",backdropFilter:"blur(6px)",position:"sticky",top:0,zIndex:20}}>
-          <div style={{position:"relative",flex:1,maxWidth:440}}>
-            <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"var(--mut)",fontSize:14}}>⌕</span>
-            <input className="focus-ring" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search tickets…"
-              style={{width:"100%",padding:"10px 14px 10px 34px",border:"1px solid var(--line2)",borderRadius:11,background:"#fff"}}/>
+        <header style={{display:"flex",alignItems:"center",gap:12,padding:"12px 24px",borderBottom:"1px solid var(--line)",background:"var(--bg)",position:"sticky",top:0,zIndex:20}}>
+          <div style={{position:"relative",flex:1,maxWidth:400}}>
+            <input className="focus-ring" value={q} onChange={e=>setQ(e.target.value)}
+              style={{width:"100%",padding:"8px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",background:"var(--bg)",color:"var(--ink)",fontSize:14}}/>
           </div>
-          {me && me.role==="admin" && bugs.length>0 &&
-            <button className="focus-ring" onClick={clearAll}
-              style={{background:"#fff",color:"var(--coral)",fontWeight:600,fontSize:12.5,padding:"10px 15px",borderRadius:10,border:"1px solid var(--coral)"}}>Clear all</button>}
-          <Identity me={me} setMe={setMe}/>
+          {me.role==="admin" && bugs.length>0 &&
+            <Btn variant="destructive" size="sm" onClick={clearAll}>Clear all</Btn>}
+          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+            <ThemeToggle/>
+            <div style={{textAlign:"right",lineHeight:1.25}}>
+              <div style={{fontSize:13,fontWeight:600}}>{me.name}</div>
+              <div className="mono" style={{fontSize:10,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.5}}>{ROLES[me.role].label}</div>
+            </div>
+            <Btn variant="outline" size="sm" onClick={()=>setMe(null)}>Sign out</Btn>
+          </div>
         </header>
 
-        {/* ticket list */}
-        <main className="scroll" style={{flex:1,overflow:"auto",padding:"22px 26px 60px"}}>
-          <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}>
-            <h1 className="disp" style={{fontSize:26,fontWeight:600}}>
-              {filter==="all"?"All tickets":STATUS[filter].label}
-            </h1>
+        <main style={{flex:1,overflow:"auto",padding:"24px"}}>
+          <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:16}}>
+            <h1 style={{fontSize:22,fontWeight:600}}>{filter==="all"?"All tickets":STATUS[filter].label}</h1>
             <span className="mono" style={{fontSize:12,color:"var(--mut)"}}>{shown.length} {shown.length===1?"ticket":"tickets"}</span>
           </div>
-
-          <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:16,overflow:"hidden",boxShadow:"0 1px 3px rgba(31,58,68,.04)"}}>
-            {/* column header */}
-            <div style={{display:"flex",alignItems:"center",gap:14,padding:"10px 22px",borderBottom:"1px solid var(--line)",
-              background:"var(--bg2)"}} className="mono">
-              <span style={{fontSize:10,color:"var(--mut)",letterSpacing:.5,width:74,flexShrink:0,textTransform:"uppercase"}}>ID</span>
-              <span style={{fontSize:10,color:"var(--mut)",letterSpacing:.5,width:118,flexShrink:0,textTransform:"uppercase"}}>Status</span>
-              <span style={{fontSize:10,color:"var(--mut)",letterSpacing:.5,flex:1,textTransform:"uppercase"}}>Title</span>
-              <span style={{fontSize:10,color:"var(--mut)",letterSpacing:.5,textTransform:"uppercase"}}>Module · Sev</span>
-              <span style={{width:18,flexShrink:0}}/>
-            </div>
-
-            {shown.length===0
-              ? <div style={{textAlign:"center",padding:"64px 20px",color:"var(--mut)"}}>
-                  <div style={{fontSize:34,marginBottom:10}}>🌤️</div>
-                  <div className="disp" style={{fontSize:17,fontWeight:600,marginBottom:5,color:"var(--ink)"}}>All clear here</div>
-                  <div style={{fontSize:13}}>No tickets in this queue. Try "All tickets", or open a new one.</div>
-                </div>
-              : shown.map(b=>(
-                  <TicketRow key={b.id} b={b} me={me} onAct={act} onDelete={del}
-                    expanded={openId===b.id} onToggle={()=>setOpenId(openId===b.id?null:b.id)}/>
-                ))
-            }
-          </div>
+          <Card style={{overflowX:"auto"}}>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Title</th>
+                  <th>Module</th>
+                  <th>Sev</th>
+                  <th style={{width:40}}/>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.length===0
+                  ? <tr><td colSpan={6} style={{textAlign:"center",padding:"40px",color:"var(--mut)"}}>No tickets in this queue.</td></tr>
+                  : shown.map(b=>(
+                      <TicketRow key={b.id} b={b} me={me} onAct={act} onDelete={del}
+                        expanded={openId===b.id} onToggle={()=>setOpenId(openId===b.id?null:b.id)}/>
+                    ))
+                }
+              </tbody>
+            </table>
+          </Card>
         </main>
       </div>
 
-      {showForm && <ReportForm onSubmit={submit} onClose={()=>setShowForm(false)}/>}
-      {toast &&
-        <div className="rise" style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",
-          background:"var(--ink)",color:"#fff",padding:"13px 22px",borderRadius:12,fontSize:13.5,fontWeight:500,
-          boxShadow:"0 12px 40px rgba(31,58,68,.32)",maxWidth:"90vw",zIndex:200}}>{toast}</div>}
+      {showForm && <TicketFormModal onSubmit={submit} onClose={()=>setShowForm(false)}/>}
+      {toast && <Toast msg={toast}/>}
     </div>
   );
 }
