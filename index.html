@@ -46,6 +46,43 @@
   th{text-align:left;font-family:'Geist Mono',monospace;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;font-weight:500;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}
   tr:hover td{background:var(--accent)}
+  /* media query for mobile support */
+  @media (max-width: 768px) {
+    aside { display: none !important; }
+    .mobile-header-menu { display: flex !important; }
+    .main-content { padding: 12px !important; }
+    table th:nth-child(4), table td:nth-child(4),
+    table th:nth-child(5), table td:nth-child(5) { display: none; }
+  }
+  .attachment-thumb {
+    position: relative;
+    display: inline-block;
+    margin: 4px;
+  }
+  .attachment-thumb img, .attachment-thumb video {
+    max-width: 120px;
+    max-height: 80px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    object-fit: cover;
+    display: block;
+  }
+  .attachment-thumb .remove-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--destructive);
+    color: white;
+    font-size: 11px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .attachment-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -57,11 +94,10 @@ const { useState, useEffect } = React;
 /* ------------------------------------------------------------------ *
  *  STORAGE LAYER
  * ------------------------------------------------------------------ */
-// Hardcoded for testing — replace with proper Supabase project credentials in production
-const supabase = window.supabase.createClient(
- "https://anuupbdmcqralxskdyur.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFudXVwYmRtY3FyYWx4c2tkeXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1OTk5NzIsImV4cCI6MjA5NzE3NTk3Mn0.sMVeXZ6ofakKAJUF3sHTq9ku9RVn0NDv6d8pcryAr2M"
-);
+// Replace with your own Supabase project credentials
+const SUPABASE_URL  = "https://anuupbdmcqralxskdyur.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFudXVwYmRtY3FyYWx4c2tkeXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1OTk5NzIsImV4cCI6MjA5NzE3NTk3Mn0.sMVeXZ6ofakKAJUF3sHTq9ku9RVn0NDv6d8pcryAr2M";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const api = {
   list:   async () => (await supabase.from("reports").select("*").order("created",{ascending:false})).data || [],
@@ -81,12 +117,14 @@ const ROLES = {
   admin:     { label:"Admin",     can:["report","verify","assign","progress","resolve","close","reopen","delete"] },
 };
 
-// Hardcoded for testing — replace with proper auth (e.g. Supabase Auth) in production
+// Hardcoded users — replace with Supabase Auth when integrating SyncUp's own auth system
 const USERS = {
   "tester@syncup.com": { pwd:"tester123", name:"Tom Bradley",  role:"tester" },
   "dev@syncup.com":    { pwd:"dev123",    name:"Dana Lin",     role:"developer" },
   "admin@syncup.com":  { pwd:"admin123",  name:"Alex Morgan",  role:"admin" },
 };
+
+const SESSION_KEY = "syncup_session";
 
 const FLOW = ["reported","verified","assigned","in_progress","resolved","closed"];
 const STATUS = {
@@ -100,108 +138,157 @@ const STATUS = {
 const SEV = { high:{l:"High",c:"var(--sev-high)"}, medium:{l:"Medium",c:"var(--sev-medium)"}, low:{l:"Low",c:"var(--sev-low)"} };
 const MODULES = ["Landing","Dashboard","Settings","Jobs","Connections","Profile","App-wide","Other"];
 
-/* ---------------- reusable components (shadcn-style) ---------------- */
+/* ------------------------------------------------------------------ *
+ *  SHARED UI PRIMITIVES
+ * ------------------------------------------------------------------ */
 function Btn({variant="default",size="default",children,style:sx,...rest}){
   const base = {fontFamily:"inherit",fontWeight:500,fontSize:14,borderRadius:"var(--radius)",cursor:"pointer",
-    display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .12s",border:"none",whiteSpace:"nowrap"};
-  const sizes = {default:{padding:"8px 16px",fontSize:14},sm:{padding:"6px 12px",fontSize:13},xs:{padding:"4px 10px",fontSize:12}};
+    display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,transition:"opacity .1s"};
   const variants = {
-    default:{background:"var(--primary)",color:"var(--primary-fg)"},
-    outline:{background:"transparent",color:"var(--ink)",border:"1px solid var(--line2)"},
-    ghost:{background:"transparent",color:"var(--ink)"},
-    destructive:{background:"var(--destructive)",color:"var(--destructive-fg)"},
-    secondary:{background:"var(--secondary)",color:"var(--secondary-fg)"},
+    default:{background:"var(--primary)",color:"var(--primary-fg)",padding:"8px 16px",border:"none"},
+    outline:{background:"transparent",color:"var(--ink)",padding:"7px 15px",border:"1px solid var(--line2)"},
+    ghost:{background:"transparent",color:"var(--ink-soft)",padding:"6px 10px",border:"none"},
+    destructive:{background:"var(--destructive)",color:"var(--destructive-fg)",padding:"8px 16px",border:"none"},
   };
-  return <button {...rest} style={{...base,...sizes[size]||sizes.default,...variants[variant]||variants.default,...sx}}>{children}</button>;
+  const sizes = { default:{}, sm:{fontSize:12,padding:"5px 10px"}, xs:{fontSize:11,padding:"3px 8px"} };
+  return <button style={{...base,...variants[variant],...sizes[size],...sx}} {...rest}>{children}</button>;
 }
 
 function Badge({variant="default",children,style:sx}){
   const base = {fontFamily:"'Geist Mono',monospace",fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:"var(--radius)",
-    display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap"};
-  const variants = {
-    default:{background:"var(--primary)",color:"var(--primary-fg)"},
-    outline:{background:"transparent",color:"var(--ink)",border:"1px solid var(--line2)"},
-    secondary:{background:"var(--secondary)",color:"var(--secondary-fg)"},
-  };
-  return <span style={{...base,...variants[variant]||variants.default,...sx}}>{children}</span>;
+    display:"inline-block"};
+  const variants = { default:{background:"var(--secondary)",color:"var(--secondary-fg)"},
+    outline:{background:"transparent",color:"var(--ink-soft)",border:"1px solid var(--line2)"} };
+  return <span style={{...base,...variants[variant],...sx}}>{children}</span>;
 }
 
 function Card({children,style:sx,...rest}){
-  return <div {...rest} style={{background:"var(--panel)",border:"1px solid var(--line)",borderRadius:"var(--radius)",...sx}}>{children}</div>;
+  return <div style={{background:"var(--panel)",border:"1px solid var(--line)",borderRadius:"var(--radius)",...sx}} {...rest}>{children}</div>;
 }
 
 function Overlay({children,onClose}){
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"grid",placeItems:"center",zIndex:100,padding:16}}>
-      <Card onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,padding:"24px",maxHeight:"90vh",overflow:"auto"}}>{children}</Card>
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:50,display:"grid",placeItems:"center",padding:16}}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{background:"var(--panel)",borderRadius:"var(--radius)",border:"1px solid var(--line)",
+        padding:24,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}}>
+        {children}
+      </div>
     </div>
   );
 }
 
 function Toast({msg}){
-  return (
-    <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",
-      background:"var(--primary)",color:"var(--primary-fg)",padding:"12px 20px",borderRadius:"var(--radius)",
-      fontSize:14,fontWeight:500,boxShadow:"0 4px 12px rgba(0,0,0,.15)",maxWidth:"90vw",zIndex:200}}>{msg}</div>
-  );
+  return <div style={{position:"fixed",bottom:24,right:24,background:"var(--primary)",color:"var(--primary-fg)",
+    padding:"10px 18px",borderRadius:"var(--radius)",fontSize:13,fontWeight:500,zIndex:100,
+    boxShadow:"0 4px 16px rgba(0,0,0,.18)"}}>{msg}</div>;
 }
 
-function Separator(){
-  return <div style={{height:1,background:"var(--line)",margin:"16px 0"}}/>;
-}
+function Separator(){ return <div style={{height:1,background:"var(--line)",margin:"16px 0"}}/>; }
 
 function StatusBadge({s}){
-  return <Badge variant="outline">{STATUS[s].label}</Badge>;
+  const colors = { reported:"var(--mut)", verified:"#6366f1", assigned:"#f59e0b",
+    in_progress:"#3b82f6", resolved:"#22c55e", closed:"var(--mut)" };
+  return <Badge style={{color:colors[s]||"var(--mut)",background:"transparent",border:`1px solid ${colors[s]||"var(--mut)"}`}}>{STATUS[s]?.label||s}</Badge>;
 }
 
 function ThemeToggle(){
   const [dark,setDark]=useState(document.documentElement.getAttribute("data-theme")==="dark");
   const toggle=()=>{const next=!dark;setDark(next);document.documentElement.setAttribute("data-theme",next?"dark":"light");};
-  return <Btn variant="ghost" size="sm" onClick={toggle} style={{fontSize:16,padding:"6px 10px"}}>{dark?"☀":"☾"}</Btn>;
+  return <Btn variant="ghost" size="sm" onClick={toggle} style={{fontSize:16}}>{dark?"☀️":"🌙"}</Btn>;
 }
 
-/* ---------- STAFF LOGIN MODAL ---------- */
+/* ------------------------------------------------------------------ *
+ *  ATTACHMENT HELPERS
+ * ------------------------------------------------------------------ */
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({ name: file.name, type: file.type, data: r.result });
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function AttachmentThumbnail({ att, onRemove }) {
+  const isVideo = att.type && att.type.startsWith("video/");
+  return (
+    <div className="attachment-thumb">
+      {isVideo
+        ? <video src={att.data} controls style={{maxWidth:120,maxHeight:80,borderRadius:"var(--radius)",border:"1px solid var(--line)"}}/>
+        : <img src={att.data} alt={att.name} style={{maxWidth:120,maxHeight:80,borderRadius:"var(--radius)",border:"1px solid var(--line)",objectFit:"cover"}}/>
+      }
+      {onRemove && <span className="remove-btn" onClick={onRemove}>×</span>}
+    </div>
+  );
+}
+
+function AttachmentViewer({ attachments }) {
+  if (!attachments || attachments.length === 0) return null;
+  return (
+    <div className="attachment-grid">
+      {attachments.map((att, i) => (
+        <AttachmentThumbnail key={i} att={att} />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ *  LOGIN MODAL
+ * ------------------------------------------------------------------ */
 function StaffLoginModal({onLogin,onClose}){
   const [email,setEmail]=useState("");
   const [pwd,setPwd]=useState("");
   const [err,setErr]=useState("");
   const attempt=()=>{
     const u=USERS[email.trim().toLowerCase()];
-    if(!u){setErr("Unknown email");return;}
-    if(u.pwd!==pwd){setErr("Wrong password");return;}
-    onLogin({name:u.name,role:u.role});
+    if(!u||u.pwd!==pwd){ setErr("Invalid email or password."); return; }
+    onLogin(u);
   };
+  const inp={width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",
+    marginBottom:12,color:"var(--ink)",background:"var(--bg)",fontSize:14};
   return (
     <Overlay onClose={onClose}>
-      <div style={{fontSize:18,fontWeight:600,marginBottom:4}}>Staff Sign In</div>
-      <div style={{fontSize:13,color:"var(--mut)",marginBottom:20}}>Tester, developer, and admin accounts only.</div>
-      <div style={{marginBottom:12}}>
-        <div className="mono" style={{fontSize:11,color:"var(--mut)",marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Email</div>
-        <input className="focus-ring" value={email} onChange={e=>setEmail(e.target.value)}
-          style={{width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",background:"var(--bg)",color:"var(--ink)"}}/>
-      </div>
-      <div style={{marginBottom:16}}>
-        <div className="mono" style={{fontSize:11,color:"var(--mut)",marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Password</div>
-        <input className="focus-ring" type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
-          onKeyDown={e=>{if(e.key==="Enter")attempt();}}
-          style={{width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",background:"var(--bg)",color:"var(--ink)"}}/>
-      </div>
-      {err && <div style={{fontSize:13,color:"var(--destructive)",marginBottom:12}}>{err}</div>}
-      <Btn onClick={attempt} style={{width:"100%"}}>Sign In</Btn>
+      <div style={{fontSize:18,fontWeight:600,marginBottom:4}}>Staff sign-in</div>
+      <div style={{fontSize:13,color:"var(--mut)",marginBottom:20}}>For SyncUp team members only.</div>
+      <input className="focus-ring" placeholder="Email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} style={inp}/>
+      <input className="focus-ring" type="password" placeholder="Password" value={pwd}
+        onChange={e=>{setPwd(e.target.value);setErr("");}}
+        onKeyDown={e=>e.key==="Enter"&&attempt()} style={inp}/>
+      {err && <div style={{color:"var(--destructive)",fontSize:13,marginBottom:10}}>{err}</div>}
+      <Btn onClick={attempt} style={{width:"100%"}}>Sign in</Btn>
     </Overlay>
   );
 }
 
-/* ---------- TICKET FORM MODAL ---------- */
+/* ------------------------------------------------------------------ *
+ *  TICKET FORM MODAL  (multiple screenshots + video)
+ * ------------------------------------------------------------------ */
 function TicketFormModal({onSubmit,onClose}){
-  const [f,setF]=useState({type:"bug",title:"",desc:"",module:"Settings",severity:"medium",email:"",shot:null});
+  const [f,setF]=useState({type:"bug",title:"",desc:"",module:"Settings",severity:"medium",email:"",attachments:[]});
   const set=(k,v)=>setF(s=>({...s,[k]:v}));
-  const pick=(e)=>{const file=e.target.files[0]; if(!file)return;
-    const r=new FileReader(); r.onload=()=>set("shot",r.result); r.readAsDataURL(file);};
-  const ok = f.title.trim() && f.desc.trim() && f.email.trim();
   const isBug = f.type==="bug";
+  const ok = f.title.trim() && f.desc.trim() && f.email.trim();
+
+  const handleFiles = async (e) => {
+    const files = Array.from(e.target.files);
+    const MAX_FILES = 5;
+    const remaining = MAX_FILES - f.attachments.length;
+    if (remaining <= 0) { alert("Maximum 5 attachments allowed."); return; }
+    const toAdd = files.slice(0, remaining);
+    const loaded = await Promise.all(toAdd.map(readFileAsDataURL));
+    set("attachments", [...f.attachments, ...loaded]);
+    e.target.value = "";
+  };
+
+  const removeAttachment = (i) => {
+    set("attachments", f.attachments.filter((_,idx) => idx !== i));
+  };
+
   const labelStyle = {fontFamily:"'Geist Mono',monospace",fontSize:11,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.5,marginBottom:6};
   const inputStyle = {width:"100%",padding:"10px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",marginBottom:14,color:"var(--ink)",background:"var(--bg)"};
+
   return (
     <Overlay onClose={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
@@ -238,125 +325,109 @@ function TicketFormModal({onSubmit,onClose}){
       </div>
       <div style={labelStyle}>Your email</div>
       <input className="focus-ring" value={f.email} onChange={e=>set("email",e.target.value)} style={inputStyle}/>
-      <div style={labelStyle}>Screenshot (optional)</div>
-      <input className="focus-ring" type="file" accept="image/*" onChange={pick} style={{fontSize:13,marginBottom:6}}/>
-      {f.shot && <img src={f.shot} alt="preview" style={{maxWidth:"100%",borderRadius:"var(--radius)",border:"1px solid var(--line)",marginTop:8}}/>}
-      <Btn disabled={!ok} onClick={()=>onSubmit({...f,severity:isBug?f.severity:"medium"})} style={{width:"100%",marginTop:20,opacity:ok?1:.5}}>Submit ticket</Btn>
+
+      {/* ---- ATTACHMENTS: multiple screenshots + video ---- */}
+      <div style={labelStyle}>Screenshots / Video <span style={{color:"var(--ring)",textTransform:"none",fontSize:10}}>(up to 5 files)</span></div>
+      <input className="focus-ring" type="file" accept="image/*,video/*" multiple onChange={handleFiles}
+        style={{fontSize:13,marginBottom:6}} disabled={f.attachments.length >= 5}/>
+      {f.attachments.length > 0 && (
+        <div className="attachment-grid" style={{marginBottom:12}}>
+          {f.attachments.map((att, i) => (
+            <AttachmentThumbnail key={i} att={att} onRemove={() => removeAttachment(i)} />
+          ))}
+        </div>
+      )}
+      {f.attachments.length >= 5 && (
+        <div style={{fontSize:12,color:"var(--mut)",marginBottom:12}}>Maximum attachments reached.</div>
+      )}
+
+      <Btn disabled={!ok} onClick={()=>onSubmit({...f,severity:isBug?f.severity:"medium"})}
+        style={{width:"100%",marginTop:8,opacity:ok?1:.5}}>Submit ticket</Btn>
     </Overlay>
   );
 }
 
-/* ---------- REPORTER VIEW (public, read-only) ---------- */
+/* ------------------------------------------------------------------ *
+ *  REPORTER VIEW  (public, no login)
+ * ------------------------------------------------------------------ */
 function ReporterView({bugs,onNewTicket}){
   const active = bugs.filter(b=>b.status!=="closed");
   return (
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column"}}>
-      <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 24px",borderBottom:"1px solid var(--line)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,borderRadius:"var(--radius)",background:"var(--primary)",color:"var(--primary-fg)",
-            display:"grid",placeItems:"center",fontWeight:700,fontSize:15}}>S</div>
-          <span style={{fontWeight:600,fontSize:16}}>SyncUp Ticket Desk</span>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <ThemeToggle/>
-          <Btn variant="outline" size="sm" onClick={()=>document.getElementById("staff-login-trigger").click()}>Staff</Btn>
-        </div>
-      </header>
-      <main style={{flex:1,padding:"32px 24px",maxWidth:960,margin:"0 auto",width:"100%"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 16px"}}>
+      <div style={{width:"100%",maxWidth:680}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:32}}>
+          <div style={{width:36,height:36,borderRadius:"var(--radius)",background:"var(--primary)",color:"var(--primary-fg)",
+            display:"grid",placeItems:"center",fontWeight:700,fontSize:16}}>S</div>
           <div>
-            <h1 style={{fontSize:24,fontWeight:600}}>Active Tickets</h1>
-            <p style={{fontSize:13,color:"var(--mut)",marginTop:4}}>{active.length} open {active.length===1?"ticket":"tickets"}</p>
+            <div style={{fontSize:18,fontWeight:600}}>SyncUp Bug Portal</div>
+            <div className="mono" style={{fontSize:11,color:"var(--mut)"}}>Report issues and track their status</div>
           </div>
-          <Btn onClick={onNewTicket}>New ticket</Btn>
+          <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+            <ThemeToggle/>
+            <Btn size="sm" variant="outline" onClick={()=>document.getElementById("staff-login-trigger").click()}>Staff login</Btn>
+          </div>
         </div>
-        <Card>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Description</th>
-                <th>Module</th>
-              </tr>
-            </thead>
-            <tbody>
-              {active.length===0
-                ? <tr><td colSpan={4} style={{textAlign:"center",padding:"40px",color:"var(--mut)"}}>No active tickets.</td></tr>
-                : active.map(b=>(
-                    <tr key={b.id}>
-                      <td className="mono" style={{fontSize:12,color:"var(--mut)",whiteSpace:"nowrap"}}>{b.id}</td>
-                      <td style={{fontWeight:500}}>{b.title}</td>
-                      <td style={{fontSize:13,color:"var(--ink-soft)",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.desc}</td>
-                      <td className="mono" style={{fontSize:12,color:"var(--mut)"}}>{b.module}</td>
-                    </tr>
-                  ))
-              }
-            </tbody>
-          </table>
-        </Card>
-      </main>
+        <Btn onClick={onNewTicket} style={{marginBottom:24,width:"100%",padding:"12px"}}>+ Report a bug or request a feature</Btn>
+        <div style={{fontSize:13,fontWeight:600,marginBottom:12,color:"var(--ink-soft)"}}>{active.length} open ticket{active.length!==1?"s":""}</div>
+        {active.map(b=>(
+          <Card key={b.id} style={{marginBottom:8,padding:"14px 18px",display:"flex",alignItems:"flex-start",gap:12}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                <span className="mono" style={{fontSize:11,color:"var(--mut)"}}>{b.id}</span>
+                <StatusBadge s={b.status}/>
+                {b.type==="bug" && <Badge style={{background:`${SEV[b.severity]?.c}22`,color:SEV[b.severity]?.c}}>{SEV[b.severity]?.l||b.severity}</Badge>}
+              </div>
+              <div style={{fontSize:14,fontWeight:500}}>{b.title}</div>
+              <div style={{fontSize:12,color:"var(--mut)",marginTop:2}}>{b.module} · {b.created}</div>
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
 
-/* ---------- TICKET ROW (staff view) ---------- */
+/* ------------------------------------------------------------------ *
+ *  TICKET ROW  (staff view)
+ * ------------------------------------------------------------------ */
 function TicketRow({b,me,onAct,onDelete,expanded,onToggle}){
   const overdue = b.due && b.status!=="resolved" && b.status!=="closed" && new Date(b.due) < new Date();
   const can = ROLES[me.role].can;
-  const isBug = b.type==="bug";
+  // Parse attachments (new multi-attachment format or legacy single shot)
+  const attachments = b.attachments
+    ? (typeof b.attachments === "string" ? JSON.parse(b.attachments) : b.attachments)
+    : (b.shot ? [{ data: b.shot, name: "screenshot", type: "image/png" }] : []);
+
   return (
     <>
       <tr onClick={onToggle} style={{cursor:"pointer"}}>
-        <td className="mono" style={{fontSize:12,color:"var(--mut)",whiteSpace:"nowrap"}}>{b.id}</td>
+        <td><span className="mono" style={{fontSize:12,color:"var(--mut)"}}>{b.id}</span></td>
         <td><StatusBadge s={b.status}/></td>
-        <td style={{fontWeight:500}}>
-          <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
-            {!isBug && <Badge variant="secondary" style={{fontSize:10}}>Feature</Badge>}
-            {b.title}
-            {overdue && <Badge variant="default" style={{background:"var(--destructive)",color:"var(--destructive-fg)",fontSize:10}}>overdue</Badge>}
-          </span>
+        <td>
+          <div style={{fontWeight:500,fontSize:14}}>{b.title}</div>
+          {b.assignee && b.assignee!=="—" && <div style={{fontSize:11,color:"var(--mut)",marginTop:2}}>{b.assignee}{overdue&&<span style={{color:"var(--destructive)",marginLeft:6}}>overdue</span>}</div>}
         </td>
-        <td className="mono" style={{fontSize:12,color:"var(--mut)"}}>{b.module}</td>
-        {isBug && <td><span style={{width:8,height:8,borderRadius:8,background:SEV[b.severity]?.c||"var(--mut)",display:"inline-block"}} title={SEV[b.severity]?.l}/></td>}
-        {!isBug && <td/>}
-        <td style={{fontSize:16,color:"var(--mut)",transition:"transform .15s",transform:expanded?"rotate(90deg)":"none",textAlign:"center",width:40}}>›</td>
+        <td><Badge variant="outline">{b.module}</Badge></td>
+        <td>{b.type==="bug"&&<Badge style={{background:`${SEV[b.severity]?.c}22`,color:SEV[b.severity]?.c}}>{SEV[b.severity]?.l}</Badge>}</td>
+        <td style={{textAlign:"right"}}><span style={{color:"var(--mut)",fontSize:16}}>{expanded?"▲":"▼"}</span></td>
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={6} style={{padding:"12px 16px 20px",background:"var(--muted)"}}>
-            <div style={{display:"flex",gap:16,fontSize:12,color:"var(--ink-soft)",flexWrap:"wrap",marginBottom:12}}>
-              <span>Reporter: {b.reporter}</span>
-              {b.assignee && b.assignee!=="—" && <span>Assigned: {b.assignee}</span>}
-              {b.due && <span>Due: {b.due}</span>}
-              {isBug && <span>Severity: {SEV[b.severity]?.l||b.severity}</span>}
+          <td colSpan={6} style={{background:"var(--bg2)",padding:"16px 20px"}}>
+            <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>
+              Reported by {b.reporter} · {b.created}{b.due&&` · Due ${b.due}`}
             </div>
-            <p style={{fontSize:14,lineHeight:1.6,color:"var(--ink)",marginBottom:b.shot?12:0,maxWidth:680}}>{b.desc}</p>
-            {b.shot && <img src={b.shot} alt="" style={{maxWidth:"100%",borderRadius:"var(--radius)",border:"1px solid var(--line)",marginTop:8}}/>}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
-              {can.includes("verify") && b.status==="reported" &&
-                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"verified"})}}>Verify</Btn>}
-              {can.includes("assign") && b.status==="verified" &&
-                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();const who=prompt("Assign to developer (name):"); if(who){const dd=new Date();dd.setDate(dd.getDate()+7);const due=prompt("Timeline / due date (YYYY-MM-DD):",dd.toISOString().slice(0,10)); onAct(b.id,{status:"assigned",assignee:"dev:"+who,due:due||""});}}}>Assign</Btn>}
-              {can.includes("progress") && b.status==="assigned" &&
-                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"in_progress"})}}>Start work</Btn>}
-              {can.includes("resolve") && (b.status==="in_progress"||b.status==="assigned") &&
-                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"resolved"})}}>Resolve</Btn>}
-              {can.includes("close") && b.status==="resolved" &&
-                <Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"closed"})}}>Close</Btn>}
-              {can.includes("reopen") && (b.status==="resolved"||b.status==="closed") &&
-                <Btn variant="destructive" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"reported",assignee:"—",due:""})}}>Reopen</Btn>}
-              {can.includes("delete") &&
-                <Btn variant="destructive" size="xs" onClick={e=>{e.stopPropagation();if(confirm("Delete "+b.id+" permanently?")) onDelete(b.id);}}>Delete</Btn>}
+            <p style={{fontSize:14,lineHeight:1.6,color:"var(--ink)",marginBottom:attachments.length?12:0,maxWidth:680}}>{b.desc}</p>
+            <AttachmentViewer attachments={attachments}/>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:16}}>
+              {can.includes("verify")&&b.status==="reported"&&<Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"verified"});}}>Verify</Btn>}
+              {can.includes("assign")&&b.status==="verified"&&<Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();const who=prompt("Assign to developer (name):"); if(who){const dd=new Date();dd.setDate(dd.getDate()+7);const due=prompt("Timeline / due date (YYYY-MM-DD):",dd.toISOString().slice(0,10)); onAct(b.id,{status:"assigned",assignee:"dev:"+who,due:due||""}); }}}>Assign</Btn>}
+              {can.includes("progress")&&b.status==="assigned"&&<Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"in_progress"});}}>Start</Btn>}
+              {can.includes("resolve")&&b.status==="in_progress"&&<Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"resolved"});}}>Resolve</Btn>}
+              {can.includes("close")&&b.status==="resolved"&&<Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"closed"});}}>Close</Btn>}
+              {can.includes("reopen")&&(b.status==="resolved"||b.status==="closed")&&<Btn variant="outline" size="xs" onClick={e=>{e.stopPropagation();onAct(b.id,{status:"reported"});}}>Reopen</Btn>}
+              {can.includes("delete")&&<Btn variant="destructive" size="xs" onClick={e=>{e.stopPropagation();if(confirm("Delete "+b.id+"?"))onDelete(b.id);}}>Delete</Btn>}
             </div>
-            {b.status==="resolved" &&
-              <div style={{marginTop:12,fontSize:12,color:"var(--ink-soft)",background:"var(--muted)",padding:"8px 12px",borderRadius:"var(--radius)",maxWidth:680}}>
-                Notification queued to {b.reporter.replace("guest:","")}: "Your ticket has been resolved."
-              </div>}
-            {overdue &&
-              <div style={{marginTop:12,fontSize:12,color:"var(--destructive)",background:"var(--muted)",padding:"8px 12px",borderRadius:"var(--radius)",maxWidth:680}}>
-                Past its timeline — admin and tester would be notified.
-              </div>}
           </td>
         </tr>
       )}
@@ -364,7 +435,9 @@ function TicketRow({b,me,onAct,onDelete,expanded,onToggle}){
   );
 }
 
-/* ---------- APP ---------- */
+/* ------------------------------------------------------------------ *
+ *  APP ROOT
+ * ------------------------------------------------------------------ */
 function App(){
   const [bugs,setBugs]=useState([]);
   const [me,setMe]=useState(null);
@@ -375,16 +448,38 @@ function App(){
   const [toast,setToast]=useState(null);
   const [openId,setOpenId]=useState(null);
 
+  /* ---- SESSION PERSISTENCE FIX ---- */
+  useEffect(()=>{
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) setMe(JSON.parse(saved));
+    } catch(e) {}
+    load();
+  },[]);
+
+  const login = (u) => {
+    setMe(u);
+    setShowLogin(false);
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); } catch(e) {}
+  };
+
+  const logout = () => {
+    setMe(null);
+    try { sessionStorage.removeItem(SESSION_KEY); } catch(e) {}
+  };
+
   const load=async()=>setBugs(await api.list());
-  useEffect(()=>{load();},[]);
 
   const submit=async(f)=>{
     const prefix = f.type==="feature"?"FEAT-":"BUG-";
-    // Hardcoded for testing — replace with proper ID generation in production
     const n = 1045 + bugs.filter(b=>b.id.startsWith(prefix)).length;
     const b={ id:prefix+n, type:f.type, title:f.title.trim(), desc:f.desc.trim(),
       module:f.module, severity:f.severity, status:"reported", reporter:"guest:"+f.email.trim(),
-      assignee:"—", due:"", created:new Date().toISOString().slice(0,10), shot:f.shot };
+      assignee:"—", due:"", created:new Date().toISOString().slice(0,10),
+      // Store all attachments as JSON string; keep shot for backwards compatibility
+      shot: f.attachments.length ? f.attachments[0].data : null,
+      attachments: JSON.stringify(f.attachments),
+    };
     await api.add(b); await load(); setShowForm(false);
     setToast("Ticket submitted — we'll email "+f.email.trim()+" on resolution.");
     setTimeout(()=>setToast(null),4200);
@@ -400,9 +495,9 @@ function App(){
     if(patch.status === "resolved") {
       const targetBug = bugs.find(b => b.id === id);
       const reporterEmail = targetBug.reporter.replace("guest:", "");
-      // Hardcoded for testing — replace with proper notification endpoint in production
       await fetch("https://anuupbdmcqralxskdyur.supabase.co/functions/v1/notify-resolved-md", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: reporterEmail, reportId: targetBug.id, title: targetBug.title }),
       });
     }
@@ -419,7 +514,7 @@ function App(){
       <>
         <ReporterView bugs={bugs} onNewTicket={()=>setShowForm(true)}/>
         <button id="staff-login-trigger" style={{display:"none"}} onClick={()=>setShowLogin(true)}/>
-        {showLogin && <StaffLoginModal onLogin={u=>{setMe(u);setShowLogin(false);}} onClose={()=>setShowLogin(false)}/>}
+        {showLogin && <StaffLoginModal onLogin={login} onClose={()=>setShowLogin(false)}/>}
         {showForm && <TicketFormModal onSubmit={submit} onClose={()=>setShowForm(false)}/>}
         {toast && <Toast msg={toast}/>}
       </>
@@ -477,6 +572,7 @@ function App(){
         <header style={{display:"flex",alignItems:"center",gap:12,padding:"12px 24px",borderBottom:"1px solid var(--line)",background:"var(--bg)",position:"sticky",top:0,zIndex:20}}>
           <div style={{position:"relative",flex:1,maxWidth:400}}>
             <input className="focus-ring" value={q} onChange={e=>setQ(e.target.value)}
+              placeholder="Search tickets…"
               style={{width:"100%",padding:"8px 12px",border:"1px solid var(--line2)",borderRadius:"var(--radius)",background:"var(--bg)",color:"var(--ink)",fontSize:14}}/>
           </div>
           {me.role==="admin" && bugs.length>0 &&
@@ -487,11 +583,11 @@ function App(){
               <div style={{fontSize:13,fontWeight:600}}>{me.name}</div>
               <div className="mono" style={{fontSize:10,color:"var(--mut)",textTransform:"uppercase",letterSpacing:.5}}>{ROLES[me.role].label}</div>
             </div>
-            <Btn variant="outline" size="sm" onClick={()=>setMe(null)}>Sign out</Btn>
+            <Btn variant="outline" size="sm" onClick={logout}>Sign out</Btn>
           </div>
         </header>
 
-        <main style={{flex:1,overflow:"auto",padding:"24px"}}>
+        <main style={{flex:1,overflow:"auto",padding:"24px"}} className="main-content">
           <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:16}}>
             <h1 style={{fontSize:22,fontWeight:600}}>{filter==="all"?"All tickets":STATUS[filter].label}</h1>
             <span className="mono" style={{fontSize:12,color:"var(--mut)"}}>{shown.length} {shown.length===1?"ticket":"tickets"}</span>
